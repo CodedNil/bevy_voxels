@@ -969,6 +969,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "bevy_voxels"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "smooth-bevy-cameras",
+]
+
+[[package]]
 name = "bevy_window"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2132,14 +2140,6 @@ dependencies = [
  "log",
  "wasi",
  "windows-sys 0.48.0",
-]
-
-[[package]]
-name = "my_bevy_game"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "smooth-bevy-cameras",
 ]
 
 [[package]]
