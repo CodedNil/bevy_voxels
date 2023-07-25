@@ -2,7 +2,7 @@ use bevy::prelude::*;
 use noise::{NoiseFn, OpenSimplex};
 
 const LARGEST_VOXEL_SIZE: f32 = 4.0;
-const SMALLEST_VOXEL_SIZE: f32 = 0.25;
+const SMALLEST_VOXEL_SIZE: f32 = 0.125;
 
 pub fn chunk_render(
     commands: &mut Commands,
@@ -40,14 +40,15 @@ fn subdivide_voxel(
         // Calculate how much of the voxel is air
         let mut n_air_voxels = 0;
         // Smaller voxels have higher threshold for air, so less small voxels made
-        let max_air_voxels: i32 = if (voxel_size - 0.5).abs() < f32::EPSILON {
+        let max_air_voxels: i32 = if (voxel_size - 0.25).abs() < f32::EPSILON {
             4
-        } else if (voxel_size - 1.0).abs() < f32::EPSILON {
+        } else if (voxel_size - 0.5).abs() < f32::EPSILON {
             2
+        } else if (voxel_size - 1.0).abs() < f32::EPSILON {
+            1
         } else {
             0
         };
-        let max_air_voxels = 0;
 
         for x in [pos3d.x - half_voxel_size, pos3d.x + half_voxel_size] {
             for z in [pos3d.z - half_voxel_size, pos3d.z + half_voxel_size] {
@@ -75,7 +76,7 @@ fn subdivide_voxel(
                 let pos2 = pos3d + Vec3::new(x, y, z) * 0.5;
                 // If voxel is too small, render it
                 if half_voxel_size <= SMALLEST_VOXEL_SIZE {
-                    if !is_inside3d(Vec3::new(x, y, z)) {
+                    if !is_inside3d(pos2) {
                         render_voxel(commands, meshes, materials, pos2, half_voxel_size);
                     }
                 } else {

@@ -3,7 +3,7 @@ use bevy::prelude::*;
 use crate::subdivision::chunk_render;
 
 const CHUNK_SIZE: f32 = 8.0;
-const RENDER_DISTANCE: i32 = 2;
+const RENDER_DISTANCE: i32 = 1;
 
 /// Chunk search algorithm to generate chunks around the player
 pub fn chunk_search(
@@ -30,8 +30,6 @@ pub fn chunk_search(
             let angle_pos = b as f32 * angle_per;
             let cos_angle_pos = angle_pos.cos();
             let sin_angle_pos = angle_pos.sin();
-            let dir_pos = Vec2::new(cos_angle_pos, sin_angle_pos);
-            let dir_neg = Vec2::new(cos_angle_pos, -sin_angle_pos);
 
             for &c in &[-1, 1] {
                 // Gets angle in order 0, 0 11.25 -11.25, 0 11.25 -11.25 22.5 -22.5
@@ -40,7 +38,11 @@ pub fn chunk_search(
                 }
 
                 // Choose direction based on c
-                let dir = if c == 1 { dir_neg } else { dir_pos };
+                let dir = if c == 1 {
+                    Vec2::new(cos_angle_pos, -sin_angle_pos)
+                } else {
+                    Vec2::new(cos_angle_pos, sin_angle_pos)
+                };
                 // Get angle index for hits shifted by offset
                 let angle_i = ((b * c) as isize + offset) as usize;
 
