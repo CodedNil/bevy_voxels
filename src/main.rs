@@ -24,6 +24,7 @@ fn main() {
 /// Chunk search algorithm to generate chunks around the player
 #[allow(clippy::cast_precision_loss)]
 #[allow(clippy::cast_possible_truncation)]
+#[allow(clippy::cast_sign_loss)]
 fn chunk_search(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
@@ -44,33 +45,38 @@ fn chunk_search(
 
     for a in 0..rotate_angles {
         for b in 0..a {
+            // Get direction to travel
+            let angle_pos = b as f32 * angle_per;
+            let angle_rad_pos = angle_pos.to_radians();
+            let cos_angle = angle_rad_pos.cos();
+            let sin_angle = angle_rad_pos.sin();
+            let dir_pos = Vec2::new(cos_angle, sin_angle);
+            let dir_neg = Vec2::new(cos_angle, -sin_angle);
+
             for c in 0..2 {
                 // Gets angle in order 0, 0 11.25 -11.25, 0 11.25 -11.25 22.5 -22.5
-                let angle = (b as f32 * angle_per) * (if c == 1 { -1.0 } else { 1.0 });
-                if angle == 0.0 && c == 1 {
+                if angle_pos == 0.0 && c == 1 {
                     continue;
                 }
-                // Step forwards from angle
-                let angle_rad = angle.to_radians();
-                let dir = Vec3::new(angle_rad.cos(), 0.0, angle_rad.sin());
 
+                // Choose direction based on c
+                let dir = if c == 1 { dir_neg } else { dir_pos };
+                let sign = if c == 1 { -1 } else { 1 };
                 // Get angle index for hits shifted by offset
-                let angle_i =
-                    ((b * (if c == 1 { -1 } else { 1 })) as isize + offset as isize) as usize;
+                let angle_i = ((b * sign) as isize + offset) as usize;
+
                 // If hit count is greater than render distance, skip
                 if hits[angle_i] > RENDER_DISTANCE {
                     continue;
                 }
+                let distance = hits[angle_i] as f32;
                 // Increment hit count
                 hits[angle_i] += 1;
-
-                let distance = *hits.get(angle_i).unwrap_or(&0) as f32;
 
                 // Round next chunk to nearest chunk size on each axis
                 let next_chunk = (
                     ((dir.x * distance).round() * CHUNK_SIZE) as i32,
                     ((dir.y * distance).round() * CHUNK_SIZE) as i32,
-                    ((dir.z * distance).round() * CHUNK_SIZE) as i32,
                 );
                 // If chunk is already in list, skip
                 if !chunks.insert(next_chunk) {
@@ -83,8 +89,8 @@ fn chunk_search(
                         .add(Color::rgb(1.0 - (chunks.len() as f32 / 1000.0), 0.0, 0.0).into()),
                     transform: Transform::from_translation(Vec3::new(
                         next_chunk.0 as f32,
+                        -CHUNK_SIZE,
                         next_chunk.1 as f32,
-                        next_chunk.2 as f32,
                     )),
                     ..default()
                 });
