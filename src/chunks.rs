@@ -3,12 +3,9 @@ use bevy::prelude::*;
 use crate::subdivision::chunk_render;
 
 const CHUNK_SIZE: f32 = 8.0;
-const RENDER_DISTANCE: i32 = 8;
+const RENDER_DISTANCE: i32 = 2;
 
 /// Chunk search algorithm to generate chunks around the player
-#[allow(clippy::cast_precision_loss)]
-#[allow(clippy::cast_possible_truncation)]
-#[allow(clippy::cast_sign_loss)]
 pub fn chunk_search(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
@@ -66,12 +63,24 @@ pub fn chunk_search(
                 }
 
                 // Render chunk
+                commands.spawn(PbrBundle {
+                    mesh: meshes.add(Mesh::from(shape::Cube { size: CHUNK_SIZE })),
+                    material: materials
+                        .add(Color::rgb(1.0 - (chunks.len() as f32 / 21.0), 0.0, 0.0).into()),
+                    transform: Transform::from_translation(Vec3::new(
+                        next_chunk.0 as f32,
+                        -CHUNK_SIZE,
+                        next_chunk.1 as f32,
+                    )),
+                    ..Default::default()
+                });
                 chunk_render(
                     &mut commands,
                     &mut meshes,
                     &mut materials,
                     next_chunk.0 as f32,
                     next_chunk.1 as f32,
+                    CHUNK_SIZE,
                 );
                 total += 1;
             }

@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use noise::{NoiseFn, OpenSimplex};
 
 const LARGEST_VOXEL_SIZE: f32 = 4.0;
 const SMALLEST_VOXEL_SIZE: f32 = 0.25;
@@ -9,14 +10,21 @@ pub fn chunk_render(
     materials: &mut ResMut<Assets<StandardMaterial>>,
     x: f32,
     y: f32,
+    chunk_size: f32,
 ) {
     subdivide_voxel(
         commands,
         meshes,
         materials,
         Vec3::new(x, 0.0, y),
-        LARGEST_VOXEL_SIZE,
+        chunk_size,
     );
+}
+
+fn is_inside3d(pos3d: Vec3) -> bool {
+    let simplex = OpenSimplex::new(42);
+    let noise_value = simplex.get([pos3d.x as f64 / 10.0, pos3d.z as f64 / 10.0]) * 5.0;
+    pos3d.y > noise_value as f32
 }
 
 fn subdivide_voxel(
@@ -26,16 +34,6 @@ fn subdivide_voxel(
     pos3d: Vec3,
     voxel_size: f32,
 ) {
-    // If voxel is too small, render it
-    if voxel_size <= SMALLEST_VOXEL_SIZE {
-        // Temporary inside3d, if y is less than x
-        let inside3d = pos3d.y < -1.3;
-        // If outside the room, render
-        if !inside3d {
-            render_voxel(commands, meshes, materials, pos3d, voxel_size);
-        }
-        return;
-    }
     let half_voxel_size = voxel_size / 2.0;
 
     if voxel_size <= LARGEST_VOXEL_SIZE {
@@ -49,13 +47,12 @@ fn subdivide_voxel(
         } else {
             0
         };
+        let max_air_voxels = 0;
 
         for x in [pos3d.x - half_voxel_size, pos3d.x + half_voxel_size] {
             for z in [pos3d.z - half_voxel_size, pos3d.z + half_voxel_size] {
                 for y in [pos3d.y - half_voxel_size, pos3d.y + half_voxel_size] {
-                    // Temporary inside3d, if y is less than x
-                    let inside3d = y < -1.3;
-                    if inside3d {
+                    if is_inside3d(Vec3::new(x, y, z)) {
                         n_air_voxels += 1;
                     }
                 }
@@ -75,7 +72,15 @@ fn subdivide_voxel(
     for x in [-half_voxel_size, half_voxel_size] {
         for z in [-half_voxel_size, half_voxel_size] {
             for y in [-half_voxel_size, half_voxel_size] {
-                subdivide_voxel(commands, meshes, materials, pos3d, half_voxel_size);
+                let pos2 = pos3d + Vec3::new(x, y, z) * 0.5;
+                // If voxel is too small, render it
+                if half_voxel_size <= SMALLEST_VOXEL_SIZE {
+                    if !is_inside3d(Vec3::new(x, y, z)) {
+                        render_voxel(commands, meshes, materials, pos2, half_voxel_size);
+                    }
+                } else {
+                    subdivide_voxel(commands, meshes, materials, pos2, half_voxel_size);
+                }
             }
         }
     }
