@@ -4,11 +4,9 @@ use smooth_bevy_cameras::{
     LookTransformPlugin,
 };
 
-const CHUNK_SIZE: f32 = 8.0;
-const LARGEST_VOXEL_SIZE: f32 = 4.0;
-const SMALLEST_VOXEL_SIZE: f32 = 0.25;
-const RENDER_DISTANCE: i32 = 16;
-const RENDER_DISTANCE_VERTICAL: i32 = 2;
+mod chunks;
+mod subdivision;
+use chunks::chunk_search;
 
 fn main() {
     App::new()
@@ -20,128 +18,6 @@ fn main() {
         .add_systems(Startup, chunk_search)
         .run();
 }
-
-/// Chunk search algorithm to generate chunks around the player
-#[allow(clippy::cast_precision_loss)]
-#[allow(clippy::cast_possible_truncation)]
-#[allow(clippy::cast_sign_loss)]
-fn chunk_search(
-    mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-) {
-    // Get start time for benchmarking
-    let start = std::time::Instant::now();
-
-    // Get chunks in efficient order
-    let rotate_angles = 8 * RENDER_DISTANCE;
-    let angle_per = 360.0 / rotate_angles as f32;
-    let mut total = 0;
-    // Store chunks in a set to prevent duplicates
-    let mut chunks = std::collections::HashSet::new();
-    // Store number of hits each angle has had, a lookup with angle as index and number of hits as value
-    let mut hits = vec![0; 2 * rotate_angles as usize];
-    let offset = rotate_angles as isize;
-
-    for a in 0..rotate_angles {
-        for b in 0..a {
-            // Get direction to travel
-            let angle_pos = b as f32 * angle_per;
-            let angle_rad_pos = angle_pos.to_radians();
-            let cos_angle = angle_rad_pos.cos();
-            let sin_angle = angle_rad_pos.sin();
-            let dir_pos = Vec2::new(cos_angle, sin_angle);
-            let dir_neg = Vec2::new(cos_angle, -sin_angle);
-
-            for c in 0..2 {
-                // Gets angle in order 0, 0 11.25 -11.25, 0 11.25 -11.25 22.5 -22.5
-                if angle_pos == 0.0 && c == 1 {
-                    continue;
-                }
-
-                // Choose direction based on c
-                let dir = if c == 1 { dir_neg } else { dir_pos };
-                let sign = if c == 1 { -1 } else { 1 };
-                // Get angle index for hits shifted by offset
-                let angle_i = ((b * sign) as isize + offset) as usize;
-
-                // If hit count is greater than render distance, skip
-                if hits[angle_i] > RENDER_DISTANCE {
-                    continue;
-                }
-                let distance = hits[angle_i] as f32;
-                // Increment hit count
-                hits[angle_i] += 1;
-
-                // Round next chunk to nearest chunk size on each axis
-                let next_chunk = (
-                    ((dir.x * distance).round() * CHUNK_SIZE) as i32,
-                    ((dir.y * distance).round() * CHUNK_SIZE) as i32,
-                );
-                // If chunk is already in list, skip
-                if !chunks.insert(next_chunk) {
-                    continue;
-                }
-                // Get chunk as bevy Vec3
-                commands.spawn(PbrBundle {
-                    mesh: meshes.add(Mesh::from(shape::Cube { size: CHUNK_SIZE })),
-                    material: materials
-                        .add(Color::rgb(1.0 - (chunks.len() as f32 / 1000.0), 0.0, 0.0).into()),
-                    transform: Transform::from_translation(Vec3::new(
-                        next_chunk.0 as f32,
-                        -CHUNK_SIZE,
-                        next_chunk.1 as f32,
-                    )),
-                    ..default()
-                });
-                total += 1;
-            }
-        }
-    }
-
-    println!("Total: {total}");
-
-    // Get end time for benchmarking
-    let end = std::time::Instant::now();
-    println!("Time: {:#?}", end - start);
-}
-
-// fn spawn_cube(
-//     mut commands: Commands,
-//     mut meshes: ResMut<Assets<Mesh>>,
-//     mut materials: ResMut<Assets<StandardMaterial>>,
-//     query: Query<(&Transform, &Camera)>,
-//     cube_query: Query<(&Transform, &Handle<Mesh>)>,
-// ) {
-//     for (transform, _) in query.iter() {
-//         let cube_mesh = meshes.add(Mesh::from(shape::Cube { size: 0.25 }));
-//         let cube_material = materials.add(Color::rgb(1.0, 0.0, 0.0).into());
-
-//         // Round the translation coordinates to the nearest whole number
-//         let grid_x = (transform.translation.x * 4.0).round() / 4.0;
-//         let grid_y = ((transform.translation.y - 1.0) * 4.0).round() / 4.0;
-//         let grid_z = (transform.translation.z * 4.0).round() / 4.0;
-//         let grid = Vec3::new(grid_x, grid_y, grid_z);
-
-//         let mut cube_exists = false;
-//         for (cube_transform, mesh_handle) in cube_query.iter() {
-//             if (cube_transform.translation - grid).length() < 0.01 {
-//                 cube_exists = true;
-//                 break;
-//             }
-//         }
-
-//         if !cube_exists {
-//             commands.spawn(PbrBundle {
-//                 mesh: cube_mesh,
-//                 material: cube_material,
-//                 transform: Transform::from_translation(Vec3::new(grid_x, grid_y, grid_z)),
-//                 ..default()
-//             });
-//             println!("Spawned cube at {:?}", grid);
-//         }
-//     }
-// }
 
 /// Set up a simple 3D scene
 fn setup(
