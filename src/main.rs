@@ -7,7 +7,7 @@ use smooth_bevy_cameras::{
 const CHUNK_SIZE: f32 = 8.0;
 const LARGEST_VOXEL_SIZE: f32 = 4.0;
 const SMALLEST_VOXEL_SIZE: f32 = 0.25;
-const RENDER_DISTANCE: i32 = 8;
+const RENDER_DISTANCE: i32 = 16;
 const RENDER_DISTANCE_VERTICAL: i32 = 2;
 
 fn main() {
@@ -23,29 +23,60 @@ fn main() {
 }
 
 /// Chunk search algorithm to generate chunks around the player
+#[allow(clippy::cast_precision_loss)]
 fn chunk_search(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
-    query: Query<(&Transform, &Camera)>,
 ) {
-    // First get all the border chunks at render distance in a circle, all chunks on the edge of the circle are border chunks
-    // Do this in rotational steps, starting with chunks at 0, 90, -90, 180 degrees, renderdistance away
-    // Step from center towards the border chunk, on chunk at a time, if this chunk isnt already in the list of chunks, add it
-    //
+    // Get start time for benchmarking
+    let start = std::time::Instant::now();
 
-    // Bake out 2 lists of chunk search orders, for straight on and 45 degree angle, these can then be rotated to have 8 lists based on players rotation
-
-    // Get x to render distance
-    for x in 0..RENDER_DISTANCE {
-        commands.spawn(PbrBundle {
-            mesh: meshes.add(Mesh::from(shape::Cube { size: CHUNK_SIZE })),
-            material: materials
-                .add(Color::rgb((x as f32) / (RENDER_DISTANCE as f32), 0.0, 0.0).into()),
-            transform: Transform::from_translation(Vec3::new((x as f32) * CHUNK_SIZE, 0.0, 0.0)),
-            ..default()
-        });
+    // Get chunks in efficient order
+    let rotate_angles = 16 * RENDER_DISTANCE;
+    let angle_per = 360.0 / rotate_angles as f32;
+    let mut total = 0;
+    let mut chunks = Vec::new();
+    for a in 0..rotate_angles {
+        for b in 0..a {
+            for c in 0..2 {
+                // Gets angle in order 0, 0 11.25 -11.25, 0 11.25 -11.25 22.5 -22.5
+                let angle = (b as f32 * angle_per) * (if c == 1 { -1.0 } else { 1.0 });
+                if angle == 0.0 && c == 1 {
+                    continue;
+                }
+                // Step forwards from angle
+                let dir = Vec3::new(angle.to_radians().cos(), 0.0, angle.to_radians().sin());
+                for x in 0..RENDER_DISTANCE {
+                    let x_f = x as f32;
+                    // Round next chunk to nearest chunk size on each axis
+                    let next_chunk = Vec3::new(
+                        ((dir.x * CHUNK_SIZE * x_f) / CHUNK_SIZE).round() * CHUNK_SIZE,
+                        ((dir.y * CHUNK_SIZE * x_f) / CHUNK_SIZE).round() * CHUNK_SIZE,
+                        ((dir.z * CHUNK_SIZE * x_f) / CHUNK_SIZE).round() * CHUNK_SIZE,
+                    );
+                    // If chunk is already in list, skip
+                    if chunks.contains(&next_chunk) {
+                        continue;
+                    }
+                    commands.spawn(PbrBundle {
+                        mesh: meshes.add(Mesh::from(shape::Cube { size: CHUNK_SIZE })),
+                        material: materials
+                            .add(Color::rgb(1.0 - (chunks.len() as f32 / 780.0), 0.0, 0.0).into()),
+                        transform: Transform::from_translation(next_chunk),
+                        ..default()
+                    });
+                    chunks.push(next_chunk);
+                    total += 1;
+                }
+            }
+        }
     }
+    println!("Total: {total}");
+
+    // Get end time for benchmarking
+    let end = std::time::Instant::now();
+    println!("Time: {:#?}", end - start);
 }
 
 // fn spawn_cube(
@@ -115,13 +146,13 @@ fn setup(
         ..default()
     });
     // Light
-    commands.spawn(PointLightBundle {
-        point_light: PointLight {
-            intensity: 1500.0,
-            shadows_enabled: true,
-            ..default()
-        },
-        transform: Transform::from_xyz(4.0, 8.0, 4.0),
-        ..default()
-    });
+    // commands.spawn(PointLightBundle {
+    //     point_light: PointLight {
+    //         intensity: 1500.0,
+    //         shadows_enabled: true,
+    //         ..default()
+    //     },
+    //     transform: Transform::from_xyz(4.0, 8.0, 4.0),
+    //     ..default()
+    // });
 }
