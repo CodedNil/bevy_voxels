@@ -18,12 +18,12 @@ fn main() {
         .add_plugins(UnrealCameraPlugin::default())
         .add_systems(Startup, setup)
         .add_systems(Startup, chunk_search)
-        // .add_systems(Update, spawn_cube)
         .run();
 }
 
 /// Chunk search algorithm to generate chunks around the player
 #[allow(clippy::cast_precision_loss)]
+#[allow(clippy::cast_possible_truncation)]
 fn chunk_search(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
@@ -33,10 +33,15 @@ fn chunk_search(
     let start = std::time::Instant::now();
 
     // Get chunks in efficient order
-    let rotate_angles = 16 * RENDER_DISTANCE;
+    let rotate_angles = 8 * RENDER_DISTANCE;
     let angle_per = 360.0 / rotate_angles as f32;
     let mut total = 0;
-    let mut chunks = Vec::new();
+    // Store chunks in a set to prevent duplicates
+    let mut chunks = std::collections::HashSet::new();
+    // Store number of hits each angle has had, a lookup with angle as index and number of hits as value
+    let mut hits = vec![0; 2 * rotate_angles as usize];
+    let offset = rotate_angles as isize;
+
     for a in 0..rotate_angles {
         for b in 0..a {
             for c in 0..2 {
@@ -46,32 +51,48 @@ fn chunk_search(
                     continue;
                 }
                 // Step forwards from angle
-                let dir = Vec3::new(angle.to_radians().cos(), 0.0, angle.to_radians().sin());
-                for x in 0..RENDER_DISTANCE {
-                    let x_f = x as f32;
-                    // Round next chunk to nearest chunk size on each axis
-                    let next_chunk = Vec3::new(
-                        ((dir.x * CHUNK_SIZE * x_f) / CHUNK_SIZE).round() * CHUNK_SIZE,
-                        ((dir.y * CHUNK_SIZE * x_f) / CHUNK_SIZE).round() * CHUNK_SIZE,
-                        ((dir.z * CHUNK_SIZE * x_f) / CHUNK_SIZE).round() * CHUNK_SIZE,
-                    );
-                    // If chunk is already in list, skip
-                    if chunks.contains(&next_chunk) {
-                        continue;
-                    }
-                    commands.spawn(PbrBundle {
-                        mesh: meshes.add(Mesh::from(shape::Cube { size: CHUNK_SIZE })),
-                        material: materials
-                            .add(Color::rgb(1.0 - (chunks.len() as f32 / 780.0), 0.0, 0.0).into()),
-                        transform: Transform::from_translation(next_chunk),
-                        ..default()
-                    });
-                    chunks.push(next_chunk);
-                    total += 1;
+                let angle_rad = angle.to_radians();
+                let dir = Vec3::new(angle_rad.cos(), 0.0, angle_rad.sin());
+
+                // Get angle index for hits shifted by offset
+                let angle_i =
+                    ((b * (if c == 1 { -1 } else { 1 })) as isize + offset as isize) as usize;
+                // If hit count is greater than render distance, skip
+                if hits[angle_i] > RENDER_DISTANCE {
+                    continue;
                 }
+                // Increment hit count
+                hits[angle_i] += 1;
+
+                let distance = *hits.get(angle_i).unwrap_or(&0) as f32;
+
+                // Round next chunk to nearest chunk size on each axis
+                let next_chunk = (
+                    ((dir.x * distance).round() * CHUNK_SIZE) as i32,
+                    ((dir.y * distance).round() * CHUNK_SIZE) as i32,
+                    ((dir.z * distance).round() * CHUNK_SIZE) as i32,
+                );
+                // If chunk is already in list, skip
+                if !chunks.insert(next_chunk) {
+                    continue;
+                }
+                // Get chunk as bevy Vec3
+                commands.spawn(PbrBundle {
+                    mesh: meshes.add(Mesh::from(shape::Cube { size: CHUNK_SIZE })),
+                    material: materials
+                        .add(Color::rgb(1.0 - (chunks.len() as f32 / 1000.0), 0.0, 0.0).into()),
+                    transform: Transform::from_translation(Vec3::new(
+                        next_chunk.0 as f32,
+                        next_chunk.1 as f32,
+                        next_chunk.2 as f32,
+                    )),
+                    ..default()
+                });
+                total += 1;
             }
         }
     }
+
     println!("Total: {total}");
 
     // Get end time for benchmarking
