@@ -25,9 +25,10 @@ pub struct Data2D {
 pub struct DataColor {
     pub color: Color,
     pub material: String,
-    pub pos_jittered: Vec3,
 }
 
+#[allow(clippy::cast_possible_truncation)]
+#[allow(clippy::cast_lossless)]
 impl DataGenerator {
     pub fn new() -> Self {
         DataGenerator {
@@ -35,21 +36,25 @@ impl DataGenerator {
         }
     }
 
-    fn get_noise(&self, x: f32) -> f32 {
+    pub fn get_noise(&self, x: f32) -> f32 {
         self.world_noise.get([x as f64, 0.0]) as f32
     }
-    fn get_noise2d(&self, x: f32, z: f32) -> f32 {
+    pub fn get_noise2d(&self, x: f32, z: f32) -> f32 {
         self.world_noise.get([x as f64, z as f64]) as f32
     }
-    fn get_world_noise(&self, offset: f64, scale: f64, x: f32) -> f32 {
-        let val = self.world_noise.get([offset * 1000.0, x as f64 * scale]);
+    pub fn get_world_noise(&self, offset: f64, scale: f64, x: f32) -> f32 {
+        let val = self
+            .world_noise
+            .get([offset * 1000.0, x as f64 * scale * 0.1]);
 
         ((1.0 + (val * 1.4)) * 0.5).clamp(0.0, 1.0) as f32
     }
-    fn get_world_noise2d(&self, offset: f64, scale: f64, x: f32, z: f32) -> f32 {
-        let val = self
-            .world_noise
-            .get([offset * 1000.0, x as f64 * scale, z as f64 * scale]);
+    pub fn get_world_noise2d(&self, offset: f64, scale: f64, x: f32, z: f32) -> f32 {
+        let val = self.world_noise.get([
+            offset * 1000.0,
+            x as f64 * scale * 0.1,
+            z as f64 * scale * 0.1,
+        ]);
 
         ((1.0 + (val * 1.4)) * 0.5).clamp(0.0, 1.0) as f32
     }
@@ -116,9 +121,6 @@ impl DataGenerator {
         let room_floor = 8.0 - self.get_world_noise2d(5.0, 0.1, x, z) * 4.0;
         let room_ceiling = 2.0 + self.get_world_noise2d(6.0, 0.1, x, z) * 3.0;
 
-        // Slight offset on the noise to make it look more natural
-        let noise_offset = self.get_world_noise2d(7.0, 4.0, x, z) * 0.02;
-
         Data2D {
             elevation,
             smoothness,
@@ -150,6 +152,7 @@ impl DataGenerator {
 
         room_inside_3d || corridor_inside_3d
     }
+
     pub fn get_data_color(&self, data2d: &Data2D, x: f32, z: f32, y: f32) -> DataColor {
         // Color from dark to light gray as elevation increases
         let shade: f32 = y / 50.0;
@@ -164,19 +167,6 @@ impl DataGenerator {
         let noise_color = 0.5 + self.get_world_noise2d(0.0, 0.1, x, z) / 2.0;
         color += Color::rgb(noise_color, noise_color * 0.5, 0.0) * 0.1;
 
-        // Jitter the pos3d
-        // Add jiggle to x and z based on noise
-        // Add elevation to y based on noise
-        let pos_jittered = Vec3::new(
-            x + (self.get_noise2d(z, y) * 0.5),
-            y + data2d.elevation,
-            z + (self.get_noise2d(x, y) * 0.5),
-        );
-
-        DataColor {
-            color,
-            material,
-            pos_jittered,
-        }
+        DataColor { color, material }
     }
 }

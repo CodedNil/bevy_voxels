@@ -6,6 +6,7 @@ use smooth_bevy_cameras::{
 };
 
 mod chunks;
+mod render;
 mod subdivision;
 mod world_noise;
 

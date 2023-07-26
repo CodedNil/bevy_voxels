@@ -3,9 +3,12 @@ use crate::world_noise;
 use bevy::prelude::*;
 
 const CHUNK_SIZE: f32 = 8.0;
-const RENDER_DISTANCE: i32 = 4;
+const RENDER_DISTANCE: usize = 4;
 
 /// Chunk search algorithm to generate chunks around the player
+#[allow(clippy::cast_precision_loss)]
+#[allow(clippy::cast_possible_truncation)]
+#[allow(clippy::cast_possible_wrap)]
 pub fn chunk_search(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
@@ -23,8 +26,7 @@ pub fn chunk_search(
     // Store chunks in a set to prevent duplicates
     let mut chunks = std::collections::HashSet::new();
     // Store number of hits each angle has had, a lookup with angle as index and number of hits as value
-    let mut hits = vec![0; 2 * rotate_angles as usize];
-    let offset = rotate_angles as isize;
+    let mut hits = vec![0; 2 * rotate_angles];
 
     // Make world noise data generator
     let data_generator = world_noise::DataGenerator::new();
@@ -49,7 +51,7 @@ pub fn chunk_search(
                     Vec2::new(cos_angle_pos, sin_angle_pos)
                 };
                 // Get angle index for hits shifted by offset
-                let angle_i = ((b * c) as isize + offset) as usize;
+                let angle_i = (b as isize * c as isize + rotate_angles as isize).unsigned_abs();
 
                 // If hit count is greater than render distance, skip
                 if hits[angle_i] > RENDER_DISTANCE {
