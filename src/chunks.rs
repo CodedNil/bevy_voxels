@@ -1,6 +1,6 @@
-use bevy::prelude::*;
-
 use crate::subdivision::chunk_render;
+use crate::world_noise;
+use bevy::prelude::*;
 
 const CHUNK_SIZE: f32 = 8.0;
 const RENDER_DISTANCE: i32 = 8;
@@ -23,6 +23,9 @@ pub fn chunk_search(
     // Store number of hits each angle has had, a lookup with angle as index and number of hits as value
     let mut hits = vec![0; 2 * rotate_angles as usize];
     let offset = rotate_angles as isize;
+
+    // Make world noise data generator
+    let data_generator = world_noise::DataGenerator::new();
 
     for a in 0..rotate_angles {
         for b in 0..a {
@@ -69,6 +72,7 @@ pub fn chunk_search(
                     &mut commands,
                     &mut meshes,
                     &mut materials,
+                    &data_generator,
                     next_chunk.0 as f32,
                     next_chunk.1 as f32,
                     CHUNK_SIZE,
