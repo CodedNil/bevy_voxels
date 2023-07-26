@@ -12,8 +12,8 @@ struct Voxel {
 }
 
 pub struct Chunk {
-    pub cubes: i32,
-    pub triangles: i32,
+    pub cubes: usize,
+    pub triangles: usize,
 }
 
 pub fn chunk_render(
@@ -96,7 +96,7 @@ pub fn chunk_render(
             }
         }
     }
-    let triangles = indices.len() as i32 / 3;
+    let triangles = indices.len() / 3;
 
     let mut render_mesh = Mesh::new(PrimitiveTopology::TriangleList);
     render_mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
@@ -112,7 +112,7 @@ pub fn chunk_render(
     });
 
     Chunk {
-        cubes: n as i32,
+        cubes: n,
         triangles,
     }
 }
@@ -152,7 +152,8 @@ fn subdivide_voxel(
         }
         // If air voxels in threshold range, render it
         if n_air_voxels <= max_air_voxels {
-            render_voxel(voxels, pos3d, voxel_size);
+            let data2d = data_generator.get_data_2d(pos3d.x, pos3d.z);
+            render_voxel(voxels, data_generator, &data2d, pos3d, voxel_size);
             return;
         }
     }
@@ -165,7 +166,7 @@ fn subdivide_voxel(
                     let data2d = data_generator.get_data_2d(x, z);
                     let inside3d = data_generator.get_data_3d(&data2d, x, z, y);
                     if !inside3d {
-                        render_voxel(voxels, pos2, half_voxel_size);
+                        render_voxel(voxels, data_generator, &data2d, pos2, half_voxel_size);
                     }
                 } else {
                     subdivide_voxel(voxels, data_generator, pos2, half_voxel_size);
@@ -175,11 +176,19 @@ fn subdivide_voxel(
     }
 }
 
-fn render_voxel(voxels: &mut Vec<Voxel>, pos: Vec3, size: f32) {
-    // Get color from height
-    let height = (pos.y + 10.0) / 20.0;
-    let color = Color::rgb(height, height, height);
+fn render_voxel(
+    voxels: &mut Vec<Voxel>,
+    data_generator: &world_noise::DataGenerator,
+    data2d: &world_noise::Data2D,
+    pos: Vec3,
+    size: f32,
+) {
+    let data_color = data_generator.get_data_color(data2d, pos.x, pos.z, pos.y);
 
     // Add voxel to list
-    voxels.push(Voxel { pos, size, color });
+    voxels.push(Voxel {
+        pos: data_color.pos_jittered,
+        size,
+        color: data_color.color,
+    });
 }

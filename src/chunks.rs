@@ -3,7 +3,7 @@ use crate::world_noise;
 use bevy::prelude::*;
 
 const CHUNK_SIZE: f32 = 8.0;
-const RENDER_DISTANCE: i32 = 8;
+const RENDER_DISTANCE: i32 = 4;
 
 /// Chunk search algorithm to generate chunks around the player
 pub fn chunk_search(

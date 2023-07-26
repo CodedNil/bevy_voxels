@@ -22,6 +22,12 @@ pub struct Data2D {
     pub room_ceiling: f32,
 }
 
+pub struct DataColor {
+    pub color: Color,
+    pub material: String,
+    pub pos_jittered: Vec3,
+}
+
 impl DataGenerator {
     pub fn new() -> Self {
         DataGenerator {
@@ -143,5 +149,34 @@ impl DataGenerator {
         let corridor_inside_3d: bool = corridor_dist_3d < data2d.corridor_width;
 
         room_inside_3d || corridor_inside_3d
+    }
+    pub fn get_data_color(&self, data2d: &Data2D, x: f32, z: f32, y: f32) -> DataColor {
+        // Color from dark to light gray as elevation increases
+        let shade: f32 = y / 50.0;
+        let rock_color = Color::rgb(0.8, 0.6, 0.3);
+        let mut color = rock_color + Color::rgb(shade, shade, shade);
+        let material = "standard".to_string();
+
+        // Give the color horizontal lines from noise to make it look more natural
+        let noise_shade: f32 = 0.1 + self.get_noise(y * 20.0 + x * 0.01 + z + 0.01) * 0.1;
+        color += Color::rgb(noise_shade, noise_shade, noise_shade);
+        // Add brown colors based on 2d noise
+        let noise_color = 0.5 + self.get_world_noise2d(0.0, 0.1, x, z) / 2.0;
+        color += Color::rgb(noise_color, noise_color * 0.5, 0.0) * 0.1;
+
+        // Jitter the pos3d
+        // Add jiggle to x and z based on noise
+        // Add elevation to y based on noise
+        let pos_jittered = Vec3::new(
+            x + (self.get_noise2d(z, y) * 0.5),
+            y + data2d.elevation,
+            z + (self.get_noise2d(x, y) * 0.5),
+        );
+
+        DataColor {
+            color,
+            material,
+            pos_jittered,
+        }
     }
 }
