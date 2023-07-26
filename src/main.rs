@@ -1,3 +1,4 @@
+use bevy::diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin};
 use bevy::prelude::*;
 use smooth_bevy_cameras::{
     controllers::unreal::{UnrealCameraBundle, UnrealCameraController, UnrealCameraPlugin},
@@ -12,8 +13,8 @@ fn main() {
     App::new()
         .insert_resource(Msaa::Sample4)
         .add_plugins(DefaultPlugins)
-        .add_plugins(LookTransformPlugin)
-        .add_plugins(UnrealCameraPlugin::default())
+        .add_plugins((LookTransformPlugin, UnrealCameraPlugin::default()))
+        .add_plugins((LogDiagnosticsPlugin::default(), FrameTimeDiagnosticsPlugin))
         .add_systems(Startup, setup)
         .add_systems(Startup, chunks::chunk_search)
         .run();

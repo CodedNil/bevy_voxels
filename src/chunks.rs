@@ -13,11 +13,13 @@ pub fn chunk_search(
 ) {
     // Get start time for benchmarking
     let start = std::time::Instant::now();
+    let mut total = 0;
+    let mut cubes = 0;
+    let mut triangles = 0;
 
     // Get chunks in efficient order
     let rotate_angles = 8 * RENDER_DISTANCE;
     let angle_per = (360.0 / rotate_angles as f32).to_radians();
-    let mut total = 0;
     // Store chunks in a set to prevent duplicates
     let mut chunks = std::collections::HashSet::new();
     // Store number of hits each angle has had, a lookup with angle as index and number of hits as value
@@ -68,21 +70,28 @@ pub fn chunk_search(
                 }
 
                 // Render chunk
-                chunk_render(
-                    &mut commands,
-                    &mut meshes,
-                    &mut materials,
-                    &data_generator,
-                    next_chunk.0 as f32,
-                    next_chunk.1 as f32,
-                    CHUNK_SIZE,
-                );
-                total += 1;
+                for y in [0, -1, 1, -2, 2] {
+                    let chunk = chunk_render(
+                        &mut commands,
+                        &mut meshes,
+                        &mut materials,
+                        &data_generator,
+                        Vec3::new(
+                            next_chunk.0 as f32,
+                            y as f32 * CHUNK_SIZE,
+                            next_chunk.1 as f32,
+                        ),
+                        CHUNK_SIZE,
+                    );
+                    total += 1;
+                    cubes += chunk.cubes;
+                    triangles += chunk.triangles;
+                }
             }
         }
     }
 
-    println!("Total: {total}");
+    println!("Total: {total} Cubes: {cubes} Triangles: {triangles}");
 
     // Get end time for benchmarking
     let end = std::time::Instant::now();
