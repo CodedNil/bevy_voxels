@@ -25,6 +25,7 @@ pub struct Data2D {
 pub struct DataColor {
     pub color: Color,
     pub material: String,
+    pub pos_jittered: Vec3,
 }
 
 #[allow(clippy::cast_possible_truncation)]
@@ -167,6 +168,17 @@ impl DataGenerator {
         let noise_color = 0.5 + self.get_world_noise2d(0.0, 0.1, x, z) / 2.0;
         color += Color::rgb(noise_color, noise_color * 0.5, 0.0) * 0.1;
 
-        DataColor { color, material }
+        // Jitter the position with noise to make it look more natural
+        let pos_jittered = Vec3::new(
+            x + (self.get_noise2d(z, y) * 0.5),
+            y + data2d.elevation,
+            z + (self.get_noise2d(x, y) * 0.5),
+        );
+
+        DataColor {
+            color,
+            material,
+            pos_jittered,
+        }
     }
 }

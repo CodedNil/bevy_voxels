@@ -1,14 +1,9 @@
 use crate::subdivision::Voxel;
-use crate::world_noise;
 use bevy::prelude::*;
 use bevy::render::{mesh::Indices, render_resource::PrimitiveTopology};
 
 #[allow(clippy::cast_possible_truncation)]
-pub fn voxels(
-    data_generator: &world_noise::DataGenerator,
-    voxels: &Vec<Voxel>,
-    pos: Vec3,
-) -> (Mesh, usize, usize) {
+pub fn voxels(voxels: &Vec<Voxel>, pos: Vec3) -> (Mesh, usize, usize) {
     // Gather triangles for rendering
     let n = voxels.len();
     let mut positions: Vec<[f32; 3]> = Vec::with_capacity(n * 36);
@@ -68,17 +63,9 @@ pub fn voxels(
                 // Calculate the index for the current vertex
                 let current_index = base_index + (face_index * 6 + vertex_index) as u32;
 
-                // Jitter the position with noise
-                let pos = corners[current_face[vertex_index]];
-                let pos_jittered = [
-                    pos[0] + data_generator.get_noise2d(pos[2], pos[1]) * 0.5,
-                    pos[1],
-                    pos[2] + data_generator.get_noise2d(pos[0], pos[1]) * 0.5,
-                ];
-
                 // Push the current index, position, normal, and color to their respective arrays
                 indices.push(current_index);
-                positions.push(pos_jittered);
+                positions.push(corners[current_face[vertex_index]]);
                 normals.push(current_normal);
                 colors.push(color);
             }

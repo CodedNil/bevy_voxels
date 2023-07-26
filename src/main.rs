@@ -1,5 +1,12 @@
-use bevy::diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin};
-use bevy::prelude::*;
+use bevy::{
+    core_pipeline::experimental::taa::{TemporalAntiAliasBundle, TemporalAntiAliasPlugin},
+    pbr::{
+        ScreenSpaceAmbientOcclusionBundle, ScreenSpaceAmbientOcclusionQualityLevel,
+        ScreenSpaceAmbientOcclusionSettings,
+    },
+    prelude::*,
+};
+use bevy_debug_text_overlay::{screen_print, OverlayPlugin};
 use smooth_bevy_cameras::{
     controllers::unreal::{UnrealCameraBundle, UnrealCameraController, UnrealCameraPlugin},
     LookTransformPlugin,
@@ -9,16 +16,29 @@ mod chunks;
 mod render;
 mod subdivision;
 mod world_noise;
-
 fn main() {
     App::new()
-        .insert_resource(Msaa::Sample4)
-        .add_plugins(DefaultPlugins)
+        .insert_resource(AmbientLight {
+            brightness: 0.2,
+            ..default()
+        })
+        .add_plugins((DefaultPlugins, TemporalAntiAliasPlugin))
+        .add_plugins(OverlayPlugin::default())
         .add_plugins((LookTransformPlugin, UnrealCameraPlugin::default()))
-        .add_plugins((LogDiagnosticsPlugin::default(), FrameTimeDiagnosticsPlugin))
         .add_systems(Startup, setup)
         .add_systems(Startup, chunks::chunk_search)
+        .add_systems(Update, screen_print_text)
         .run();
+}
+
+fn screen_print_text(time: Res<Time>) {
+    let current_time = time.elapsed_seconds_f64();
+    let at_interval = |t: f64| current_time % t < time.delta_seconds_f64();
+    if at_interval(0.1) {
+        let last_fps = 1.0 / time.delta_seconds();
+        screen_print!("current time: {current_time:.2}");
+        screen_print!(col: Color::CYAN, "fps: {last_fps:.0}");
+    }
 }
 
 /// Set up a simple 3D scene
@@ -29,7 +49,24 @@ fn setup(
 ) {
     // Camera
     commands
-        .spawn(Camera3dBundle::default())
+        .spawn((
+            Camera3dBundle::default(),
+            FogSettings {
+                color: Color::rgba(0.05, 0.05, 0.05, 1.0),
+                falloff: FogFalloff::Linear {
+                    start: 10.0,
+                    end: 100.0,
+                },
+                ..default()
+            },
+        ))
+        .insert(ScreenSpaceAmbientOcclusionBundle {
+            settings: ScreenSpaceAmbientOcclusionSettings {
+                quality_level: ScreenSpaceAmbientOcclusionQualityLevel::Ultra,
+            },
+            ..Default::default()
+        })
+        .insert(TemporalAntiAliasBundle::default())
         .insert(UnrealCameraBundle::new(
             UnrealCameraController::default(),
             Vec3::new(-2.0, 5.0, 5.0),
@@ -48,6 +85,18 @@ fn setup(
         mesh: meshes.add(Mesh::from(shape::Cube { size: 1.0 })),
         material: materials.add(Color::rgb(0.8, 0.7, 0.6).into()),
         transform: Transform::from_xyz(0.0, 0.5, 0.0),
+        ..default()
+    });
+    // Sky
+    commands.spawn(PbrBundle {
+        mesh: meshes.add(Mesh::from(shape::Box::default())),
+        material: materials.add(StandardMaterial {
+            base_color: Color::hex("888888").unwrap(),
+            unlit: true,
+            cull_mode: None,
+            ..default()
+        }),
+        transform: Transform::from_scale(Vec3::splat(1_000_000.0)),
         ..default()
     });
     // Sun

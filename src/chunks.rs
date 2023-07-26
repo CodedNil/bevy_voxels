@@ -72,7 +72,7 @@ pub fn chunk_search(
                 }
 
                 // Render chunk
-                for y in [0, -1, 1, -2, 2] {
+                for y in [0, -1, 1, 2] {
                     let chunk = chunk_render(
                         &mut commands,
                         &mut meshes,

@@ -30,10 +30,15 @@ pub fn chunk_render(
     let voxels = voxels;
 
     // Render the mesh
-    let (render_mesh, cubes, triangles) = render::voxels(data_generator, &voxels, pos);
+    let (render_mesh, cubes, triangles) = render::voxels(&voxels, pos);
     commands.spawn(PbrBundle {
         mesh: meshes.add(render_mesh),
-        material: materials.add(StandardMaterial::from(Color::rgb(1.0, 1.0, 1.0))),
+        material: materials.add(StandardMaterial {
+            base_color: Color::WHITE,
+            metallic: 0.8,
+            perceptual_roughness: 0.3,
+            ..default()
+        }),
         transform: Transform::from_xyz(pos.x, pos.y, pos.z),
         ..Default::default()
     });
@@ -111,7 +116,7 @@ fn render_voxel(
 
     // Add voxel to list
     voxels.push(Voxel {
-        pos,
+        pos: data_color.pos_jittered,
         size,
         color: data_color.color,
     });
