@@ -32,6 +32,7 @@ pub fn chunk_render(
     let n = voxels.len();
     let mut positions: Vec<[f32; 3]> = Vec::with_capacity(n * 36);
     let mut normals: Vec<[f32; 3]> = Vec::with_capacity(n * 36);
+    let mut colors: Vec<[f32; 4]> = Vec::with_capacity(n * 36);
     let mut indices: Vec<u32> = Vec::with_capacity(n * 36);
 
     let faces = [
@@ -65,6 +66,13 @@ pub fn chunk_render(
             voxel.pos + Vec3::new(-half_size, -half_size, -half_size),
         ];
 
+        let color = [
+            voxel.color.r(),
+            voxel.color.g(),
+            voxel.color.b(),
+            voxel.color.a(),
+        ];
+
         let current_index = (i * 36) as u32;
         for k in 0..6 {
             let fk = faces[k];
@@ -76,19 +84,15 @@ pub fn chunk_render(
                 indices.push(current_index + (k * 6 + j) as u32);
                 positions.push([corners[idx].x, corners[idx].y, corners[idx].z]);
                 normals.push(normal);
+                colors.push(color);
             }
         }
     }
 
     let mut render_mesh = Mesh::new(PrimitiveTopology::TriangleList);
-    render_mesh.insert_attribute(
-        MeshVertexAttribute::new("Vertex_Position", 0, VertexFormat::Float32x3),
-        VertexAttributeValues::Float32x3(positions),
-    );
-    render_mesh.insert_attribute(
-        MeshVertexAttribute::new("Vertex_Normal", 1, VertexFormat::Float32x3),
-        VertexAttributeValues::Float32x3(normals),
-    );
+    render_mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
+    render_mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
+    render_mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, colors);
     render_mesh.set_indices(Some(Indices::U32(indices)));
 
     commands.spawn(PbrBundle {
@@ -157,10 +161,13 @@ fn subdivide_voxel(voxels: &mut Vec<Voxel>, pos3d: Vec3, voxel_size: f32) {
     }
 }
 
-fn render_voxel(voxels: &mut Vec<Voxel>, pos3d: Vec3, voxel_size: f32) {
-    voxels.push(Voxel {
-        pos: pos3d,
-        size: voxel_size,
-        color: Color::rgb(1.0, 0.0, 0.0),
-    });
+fn render_voxel(voxels: &mut Vec<Voxel>, pos: Vec3, size: f32) {
+    // Get color from height, with a bit of randomness
+    let simplex = OpenSimplex::new(42);
+    let noise_value = simplex.get([pos.x as f64 / 10.0, pos.z as f64 / 10.0]) * 5.0;
+    let height = (pos.y - noise_value as f32) / 10.0;
+    let color = Color::rgb(height, height, height);
+
+    // Add voxel to list
+    voxels.push(Voxel { pos, size, color });
 }
