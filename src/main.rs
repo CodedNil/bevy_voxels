@@ -1,8 +1,8 @@
 use bevy::{
     core_pipeline::experimental::taa::{TemporalAntiAliasBundle, TemporalAntiAliasPlugin},
     pbr::{
-        ScreenSpaceAmbientOcclusionBundle, ScreenSpaceAmbientOcclusionQualityLevel,
-        ScreenSpaceAmbientOcclusionSettings,
+        NotShadowCaster, ScreenSpaceAmbientOcclusionBundle,
+        ScreenSpaceAmbientOcclusionQualityLevel, ScreenSpaceAmbientOcclusionSettings,
     },
     prelude::*,
 };
@@ -22,7 +22,8 @@ fn main() {
             brightness: 0.2,
             ..default()
         })
-        .add_plugins((DefaultPlugins, TemporalAntiAliasPlugin))
+        .add_plugins(DefaultPlugins)
+        .add_plugins(TemporalAntiAliasPlugin)
         .add_plugins(OverlayPlugin::default())
         .add_plugins((LookTransformPlugin, UnrealCameraPlugin::default()))
         .add_systems(Startup, setup)
@@ -54,15 +55,15 @@ fn setup(
             FogSettings {
                 color: Color::rgba(0.05, 0.05, 0.05, 1.0),
                 falloff: FogFalloff::Linear {
-                    start: 10.0,
-                    end: 100.0,
+                    start: 50.0,
+                    end: 200.0,
                 },
                 ..default()
             },
         ))
         .insert(ScreenSpaceAmbientOcclusionBundle {
             settings: ScreenSpaceAmbientOcclusionSettings {
-                quality_level: ScreenSpaceAmbientOcclusionQualityLevel::Ultra,
+                quality_level: ScreenSpaceAmbientOcclusionQualityLevel::Low,
             },
             ..Default::default()
         })
@@ -88,17 +89,20 @@ fn setup(
         ..default()
     });
     // Sky
-    commands.spawn(PbrBundle {
-        mesh: meshes.add(Mesh::from(shape::Box::default())),
-        material: materials.add(StandardMaterial {
-            base_color: Color::hex("888888").unwrap(),
-            unlit: true,
-            cull_mode: None,
+    commands.spawn((
+        PbrBundle {
+            mesh: meshes.add(Mesh::from(shape::Box::default())),
+            material: materials.add(StandardMaterial {
+                base_color: Color::hex("888888").unwrap(),
+                unlit: true,
+                cull_mode: None,
+                ..default()
+            }),
+            transform: Transform::from_scale(Vec3::splat(1_000_000.0)),
             ..default()
-        }),
-        transform: Transform::from_scale(Vec3::splat(1_000_000.0)),
-        ..default()
-    });
+        },
+        NotShadowCaster,
+    ));
     // Sun
     commands.spawn(DirectionalLightBundle {
         directional_light: DirectionalLight {

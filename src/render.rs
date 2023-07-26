@@ -1,11 +1,11 @@
-use crate::subdivision::Voxel;
+use crate::subdivision::Cube;
 use bevy::prelude::*;
 use bevy::render::{mesh::Indices, render_resource::PrimitiveTopology};
 
 #[allow(clippy::cast_possible_truncation)]
-pub fn voxels(voxels: &Vec<Voxel>, pos: Vec3) -> (Mesh, usize, usize) {
+pub fn cubes(cubes: &Vec<Cube>, pos: Vec3) -> (Mesh, usize, usize) {
     // Gather triangles for rendering
-    let n = voxels.len();
+    let n = cubes.len();
     let mut positions: Vec<[f32; 3]> = Vec::with_capacity(n * 36);
     let mut normals: Vec<[f32; 3]> = Vec::with_capacity(n * 36);
     let mut colors: Vec<[f32; 4]> = Vec::with_capacity(n * 36);
@@ -28,12 +28,12 @@ pub fn voxels(voxels: &Vec<Voxel>, pos: Vec3) -> (Mesh, usize, usize) {
         [-1.0, 0.0, 0.0], // Right face
     ];
 
-    for (i, voxel) in voxels.iter().enumerate() {
-        let half_size = voxel.size / 2.0;
+    for (i, cube) in cubes.iter().enumerate() {
+        let half_size = cube.size / 2.0;
 
-        let px = voxel.pos.x - pos.x;
-        let py = voxel.pos.y - pos.y;
-        let pz = voxel.pos.z - pos.z;
+        let px = cube.pos.x - pos.x;
+        let py = cube.pos.y - pos.y;
+        let pz = cube.pos.z - pos.z;
         let corners = [
             [px + half_size, py + half_size, pz + half_size],
             [px + half_size, py - half_size, pz + half_size],
@@ -46,10 +46,10 @@ pub fn voxels(voxels: &Vec<Voxel>, pos: Vec3) -> (Mesh, usize, usize) {
         ];
 
         let color = [
-            voxel.color.r(),
-            voxel.color.g(),
-            voxel.color.b(),
-            voxel.color.a(),
+            cube.color.r(),
+            cube.color.g(),
+            cube.color.b(),
+            cube.color.a(),
         ];
 
         // Loop over each face of the cube

@@ -3,7 +3,7 @@ use crate::world_noise;
 use bevy::prelude::*;
 
 const CHUNK_SIZE: f32 = 8.0;
-const RENDER_DISTANCE: usize = 4;
+const RENDER_DISTANCE: usize = 1;
 
 /// Chunk search algorithm to generate chunks around the player
 #[allow(clippy::cast_precision_loss)]
