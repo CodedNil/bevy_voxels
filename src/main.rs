@@ -6,7 +6,6 @@ use smooth_bevy_cameras::{
 
 mod chunks;
 mod subdivision;
-use chunks::chunk_search;
 
 fn main() {
     App::new()
@@ -15,7 +14,7 @@ fn main() {
         .add_plugins(LookTransformPlugin)
         .add_plugins(UnrealCameraPlugin::default())
         .add_systems(Startup, setup)
-        .add_systems(Startup, chunk_search)
+        .add_systems(Startup, chunks::chunk_search)
         .run();
 }
 
