@@ -3,7 +3,7 @@ use bevy::prelude::*;
 use bevy::render::{mesh::Indices, render_resource::PrimitiveTopology};
 
 #[allow(clippy::cast_possible_truncation)]
-pub fn cubes(cubes: &Vec<Cube>, pos: Vec3) -> (Mesh, usize, usize) {
+pub fn cubes(cubes: &Vec<Cube>, pos: Vec3) -> (Mesh, usize) {
     // Gather triangles for rendering
     let n = cubes.len();
     let mut positions: Vec<[f32; 3]> = Vec::with_capacity(n * 36);
@@ -79,5 +79,5 @@ pub fn cubes(cubes: &Vec<Cube>, pos: Vec3) -> (Mesh, usize, usize) {
     render_mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, colors);
     render_mesh.set_indices(Some(Indices::U32(indices)));
 
-    (render_mesh, n, triangles)
+    (render_mesh, triangles)
 }

@@ -12,8 +12,8 @@ pub struct Cube {
 }
 
 pub struct Chunk {
-    pub cubes: usize,
-    pub triangles: usize,
+    pub n_cubes: usize,
+    pub n_triangles: usize,
 }
 
 pub fn chunk_render(
@@ -30,7 +30,7 @@ pub fn chunk_render(
     let cubes = cubes;
 
     // Render the mesh
-    let (render_mesh, cubes, triangles) = render::cubes(&cubes, pos);
+    let (render_mesh, n_triangles) = render::cubes(&cubes, pos);
     commands.spawn(PbrBundle {
         mesh: meshes.add(render_mesh),
         material: materials.add(StandardMaterial {
@@ -43,7 +43,10 @@ pub fn chunk_render(
         ..Default::default()
     });
 
-    Chunk { cubes, triangles }
+    Chunk {
+        n_cubes: cubes.len(),
+        n_triangles,
+    }
 }
 
 fn subdivide_cube(
@@ -53,6 +56,7 @@ fn subdivide_cube(
     cube_size: f32,
 ) {
     let half_cube_size = cube_size / 2.0;
+    let quarter_cube_size = cube_size / 4.0;
 
     if cube_size <= LARGEST_CUBE_SIZE {
         // Calculate how much of the cube is air
@@ -88,18 +92,23 @@ fn subdivide_cube(
         }
     }
     // Otherwise, subdivide it into 8 smaller cubes
-    for x in [-half_cube_size, half_cube_size] {
-        for z in [-half_cube_size, half_cube_size] {
-            for y in [-half_cube_size, half_cube_size] {
-                let pos2 = pos3d + Vec3::new(x, y, z) * 0.5;
+    for x in [pos3d.x - quarter_cube_size, pos3d.x + quarter_cube_size] {
+        for z in [pos3d.z - quarter_cube_size, pos3d.z + quarter_cube_size] {
+            for y in [pos3d.y - quarter_cube_size, pos3d.y + quarter_cube_size] {
                 if half_cube_size < SMALLEST_CUBE_SIZE {
                     let data2d = data_generator.get_data_2d(x, z);
                     let is_inside = data_generator.get_data_3d(&data2d, x, z, y);
                     if !is_inside {
-                        render_cube(cubes, data_generator, &data2d, pos2, half_cube_size);
+                        render_cube(
+                            cubes,
+                            data_generator,
+                            &data2d,
+                            Vec3::new(x, y, z),
+                            half_cube_size,
+                        );
                     }
                 } else {
-                    subdivide_cube(cubes, data_generator, pos2, half_cube_size);
+                    subdivide_cube(cubes, data_generator, Vec3::new(x, y, z), half_cube_size);
                 }
             }
         }
@@ -115,7 +124,7 @@ fn render_cube(
 ) {
     let data_color = data_generator.get_data_color(data2d, pos.x, pos.z, pos.y);
     cubes.push(Cube {
-        pos,
+        pos: data_color.pos_jittered,
         size,
         color: data_color.color,
     });

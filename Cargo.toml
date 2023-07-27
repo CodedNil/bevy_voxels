@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 bevy = "0.11.0"
 bevy-debug-text-overlay = "6.0.0"
+block-mesh = { git = "https://github.com/bonsairobo/block-mesh-rs/" }
 noise = "0.8.2"
 rand = "0.8.5"
 smooth-bevy-cameras = { git = "https://github.com/bonsairobo/smooth-bevy-cameras", rev = "90b1c75022316a3dd89f3a1e8cf9cf3dfaf7f401" }

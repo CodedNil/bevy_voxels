@@ -1,8 +1,9 @@
+use crate::block;
 use crate::subdivision::chunk_render;
 use crate::world_noise;
 use bevy::prelude::*;
 
-const CHUNK_SIZE: f32 = 8.0;
+pub const CHUNK_SIZE: f32 = 8.0;
 const RENDER_DISTANCE: usize = 1;
 
 /// Chunk search algorithm to generate chunks around the player
@@ -86,8 +87,23 @@ pub fn chunk_search(
                         CHUNK_SIZE,
                     );
                     total += 1;
-                    cubes += chunk.cubes;
-                    triangles += chunk.triangles;
+                    cubes += chunk.n_cubes;
+                    triangles += chunk.n_triangles;
+
+                    // let chunk = block::render_chunk(
+                    //     &data_generator,
+                    //     &mut commands,
+                    //     &mut meshes,
+                    //     &mut materials,
+                    //     Vec3::new(
+                    //         next_chunk.0 as f32,
+                    //         y as f32 * CHUNK_SIZE,
+                    //         next_chunk.1 as f32,
+                    //     ),
+                    // );
+                    // total += 1;
+                    // cubes += chunk.n_cubes;
+                    // triangles += chunk.n_triangles;
                 }
             }
         }

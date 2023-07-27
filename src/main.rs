@@ -1,10 +1,14 @@
 use bevy::{
     core_pipeline::experimental::taa::{TemporalAntiAliasBundle, TemporalAntiAliasPlugin},
     pbr::{
-        NotShadowCaster, ScreenSpaceAmbientOcclusionBundle,
+        wireframe::WireframePlugin, NotShadowCaster, ScreenSpaceAmbientOcclusionBundle,
         ScreenSpaceAmbientOcclusionQualityLevel, ScreenSpaceAmbientOcclusionSettings,
     },
     prelude::*,
+    render::{
+        settings::{WgpuFeatures, WgpuSettings},
+        RenderPlugin,
+    },
 };
 use bevy_debug_text_overlay::{screen_print, OverlayPlugin};
 use smooth_bevy_cameras::{
@@ -12,22 +16,32 @@ use smooth_bevy_cameras::{
     LookTransformPlugin,
 };
 
+mod block;
 mod chunks;
 mod render;
 mod subdivision;
 mod world_noise;
+
 fn main() {
     App::new()
         .insert_resource(AmbientLight {
             brightness: 0.2,
             ..default()
         })
-        .add_plugins(DefaultPlugins)
+        .add_plugins(DefaultPlugins.set(RenderPlugin {
+            wgpu_settings: WgpuSettings {
+                features: WgpuFeatures::POLYGON_MODE_LINE,
+                // backends: Some(Backends::DX12),
+                ..default()
+            },
+        }))
+        .add_plugins(WireframePlugin)
         .add_plugins(TemporalAntiAliasPlugin)
         .add_plugins(OverlayPlugin::default())
         .add_plugins((LookTransformPlugin, UnrealCameraPlugin::default()))
         .add_systems(Startup, setup)
         .add_systems(Startup, chunks::chunk_search)
+        // .add_systems(Startup, block::setup)
         .add_systems(Update, screen_print_text)
         .run();
 }
