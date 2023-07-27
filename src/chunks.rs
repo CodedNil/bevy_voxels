@@ -3,8 +3,8 @@ use crate::world_noise;
 use bevy::prelude::*;
 use rayon::prelude::*;
 
-pub const CHUNK_SIZE: f32 = 8.0;
-const RENDER_DISTANCE: usize = 8;
+pub const CHUNK_SIZE: f32 = 4.0;
+const RENDER_DISTANCE: usize = 16;
 
 /// Chunk search algorithm to generate chunks around the player
 #[allow(clippy::cast_precision_loss)]
@@ -28,6 +28,16 @@ pub fn chunk_search(
     let mut chunks = std::collections::HashSet::new();
     // Store number of hits each angle has had, a lookup with angle as index and number of hits as value
     let mut hits = vec![0; 2 * rotate_angles];
+
+    // Get y levels to render eg 0, -1, 1, -2, 2, 3, 4
+    let (y_min, y_max) = (-2_i32, 4_i32);
+    let y_levels: Vec<i32> = std::iter::once(0)
+        .chain((1..=y_min.abs().max(y_max)).flat_map(|i| {
+            std::iter::once(-i)
+                .filter(move |_| -i >= y_min)
+                .chain(std::iter::once(i).filter(move |_| i <= y_max))
+        }))
+        .collect();
 
     // Make world noise data generator
     let data_generator = world_noise::DataGenerator::new();
@@ -73,7 +83,8 @@ pub fn chunk_search(
                 }
 
                 // Render chunk
-                let results: Vec<_> = [0, -1, 1, 2]
+                let mut filled_y = 0;
+                let results: Vec<_> = y_levels
                     .par_iter()
                     .map(|&y| {
                         chunk_render(
@@ -93,6 +104,11 @@ pub fn chunk_search(
                     cubes += chunk.n_cubes;
                     triangles += chunk.n_triangles;
 
+                    // If chunk has been filled entirely,
+                    if chunk.n_cubes == 8 {
+                        filled_y += 1;
+                    }
+
                     let (chunk_x, chunk_z, chunk_y) = chunk.chunk_pos;
                     commands.spawn(PbrBundle {
                         mesh: meshes.add(chunk.mesh),
@@ -105,6 +121,10 @@ pub fn chunk_search(
                         transform: Transform::from_xyz(chunk_x, chunk_y, chunk_z),
                         ..Default::default()
                     });
+                }
+                // If chunk has been filled entirely, skip the rest of the chunks in this direction
+                if filled_y == y_levels.len() {
+                    hits[angle_i] += RENDER_DISTANCE;
                 }
             }
         }

@@ -1,7 +1,6 @@
 use crate::subdivision::Cube;
 use bevy::prelude::*;
 use bevy::render::{mesh::Indices, render_resource::PrimitiveTopology};
-use rayon::prelude::*;
 
 const FACES: [[usize; 6]; 6] = [
     [2, 1, 0, 3, 1, 2], // Front face
