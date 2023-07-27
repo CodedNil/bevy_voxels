@@ -1,6 +1,7 @@
 use crate::subdivision::Cube;
 use bevy::prelude::*;
 use bevy::render::{mesh::Indices, render_resource::PrimitiveTopology};
+use rayon::prelude::*;
 
 const FACES: [[usize; 6]; 6] = [
     [2, 1, 0, 3, 1, 2], // Front face
@@ -20,37 +21,42 @@ const FACE_NORMALS: [[f32; 3]; 6] = [
 ];
 
 #[allow(clippy::cast_possible_truncation)]
-pub fn cubes(cubes: &Vec<Cube>, pos: Vec3) -> (Mesh, usize) {
-    // Gather triangles for rendering
-    let n = cubes.len();
-    let mut positions: Vec<[f32; 3]> = Vec::with_capacity(n * 36);
-    let mut normals: Vec<[f32; 3]> = Vec::with_capacity(n * 36);
-    let mut colors: Vec<[f32; 4]> = Vec::with_capacity(n * 36);
-    let mut indices: Vec<u32> = Vec::with_capacity(n * 36);
+#[allow(clippy::similar_names)]
+pub fn cubes_mesh(cubes: &Vec<Cube>, chunk_pos: (f32, f32, f32)) -> (Mesh, usize) {
+    let (chunk_x, chunk_z, chunk_y) = chunk_pos;
+
+    let n_cubes = cubes.len();
+    let n_triangles = n_cubes * 12;
+    let mut positions: Vec<[f32; 3]> = Vec::with_capacity(n_cubes * 36);
+    let mut normals: Vec<[f32; 3]> = Vec::with_capacity(n_cubes * 36);
+    let mut colors: Vec<[f32; 4]> = Vec::with_capacity(n_cubes * 36);
+    let mut indices: Vec<u32> = Vec::with_capacity(n_cubes * 36);
 
     for (i, cube) in cubes.iter().enumerate() {
         let half_size = cube.size / 2.0;
 
-        let px = cube.pos.x - pos.x;
-        let py = cube.pos.y - pos.y;
-        let pz = cube.pos.z - pos.z;
+        let (corner_x, corner_z, corner_y) = cube.pos;
+        let (real_x, real_z, real_y) = (corner_x - chunk_x, corner_z - chunk_z, corner_y - chunk_y);
+        let (real_x_minus, real_x_plus, real_z_minus, real_z_plus, real_y_minus, real_y_plus) = (
+            real_x - half_size,
+            real_x + half_size,
+            real_z - half_size,
+            real_z + half_size,
+            real_y - half_size,
+            real_y + half_size,
+        );
         let corners = [
-            [px + half_size, py + half_size, pz + half_size],
-            [px + half_size, py - half_size, pz + half_size],
-            [px - half_size, py + half_size, pz + half_size],
-            [px - half_size, py - half_size, pz + half_size],
-            [px + half_size, py + half_size, pz - half_size],
-            [px + half_size, py - half_size, pz - half_size],
-            [px - half_size, py + half_size, pz - half_size],
-            [px - half_size, py - half_size, pz - half_size],
+            [real_x_plus, real_y_plus, real_z_plus],
+            [real_x_plus, real_y_minus, real_z_plus],
+            [real_x_minus, real_y_plus, real_z_plus],
+            [real_x_minus, real_y_minus, real_z_plus],
+            [real_x_plus, real_y_plus, real_z_minus],
+            [real_x_plus, real_y_minus, real_z_minus],
+            [real_x_minus, real_y_plus, real_z_minus],
+            [real_x_minus, real_y_minus, real_z_minus],
         ];
 
-        let color = [
-            cube.color.r(),
-            cube.color.g(),
-            cube.color.b(),
-            cube.color.a(),
-        ];
+        let color = [cube.color.0, cube.color.1, cube.color.2, 1.0];
 
         // Loop over each face of the cube
         let base_index = (i * 36) as u32;
@@ -71,7 +77,6 @@ pub fn cubes(cubes: &Vec<Cube>, pos: Vec3) -> (Mesh, usize) {
             }
         }
     }
-    let triangles = indices.len() / 3;
 
     let mut render_mesh = Mesh::new(PrimitiveTopology::TriangleList);
     render_mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
@@ -79,5 +84,5 @@ pub fn cubes(cubes: &Vec<Cube>, pos: Vec3) -> (Mesh, usize) {
     render_mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, colors);
     render_mesh.set_indices(Some(Indices::U32(indices)));
 
-    (render_mesh, triangles)
+    (render_mesh, n_triangles)
 }

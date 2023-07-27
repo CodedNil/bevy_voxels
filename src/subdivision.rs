@@ -7,42 +7,28 @@ const LARGEST_CUBE_SIZE: f32 = 2.0;
 const SMALLEST_CUBE_SIZE: f32 = 0.25;
 
 pub struct Cube {
-    pub pos: Vec3,
+    pub pos: (f32, f32, f32),
     pub size: f32,
-    pub color: Color,
+    pub color: (f32, f32, f32),
 }
 
 pub struct Chunk {
+    pub mesh: Mesh,
+    pub chunk_pos: (f32, f32, f32),
     pub n_cubes: usize,
     pub n_triangles: usize,
 }
 
 pub fn chunk_render(
-    commands: &mut Commands,
-    meshes: &mut ResMut<Assets<Mesh>>,
-    materials: &mut ResMut<Assets<StandardMaterial>>,
     data_generator: &DataGenerator,
-    pos: Vec3,
+    chunk_pos: (f32, f32, f32),
     chunk_size: f32,
 ) -> Chunk {
-    // Subdivide the cube and store the result in the cubes vector
-    let cubes: Vec<Cube> = subdivide_cube(data_generator, (pos.x, pos.z, pos.y), chunk_size);
-
-    // Render the mesh
-    let (render_mesh, n_triangles) = render::cubes(&cubes, pos);
-    commands.spawn(PbrBundle {
-        mesh: meshes.add(render_mesh),
-        material: materials.add(StandardMaterial {
-            base_color: Color::WHITE,
-            metallic: 0.8,
-            perceptual_roughness: 0.3,
-            ..default()
-        }),
-        transform: Transform::from_xyz(pos.x, pos.y, pos.z),
-        ..Default::default()
-    });
-
+    let cubes: Vec<Cube> = subdivide_cube(data_generator, chunk_pos, chunk_size);
+    let (render_mesh, n_triangles) = render::cubes_mesh(&cubes, chunk_pos);
     Chunk {
+        mesh: render_mesh,
+        chunk_pos,
         n_cubes: cubes.len(),
         n_triangles,
     }
@@ -51,10 +37,10 @@ pub fn chunk_render(
 #[allow(clippy::cast_precision_loss)]
 fn subdivide_cube(
     data_generator: &DataGenerator,
-    pos: (f32, f32, f32),
+    chunk_pos: (f32, f32, f32),
     cube_size: f32,
 ) -> Vec<Cube> {
-    let (px, pz, py) = pos;
+    let (px, pz, py) = chunk_pos;
     let mut cubes: Vec<Cube> = Vec::new();
 
     let half_cube_size = cube_size / 2.0;
@@ -89,7 +75,12 @@ fn subdivide_cube(
         // If air cubes in threshold range, render it
         if n_air_cubes <= max_air_cubes {
             let data2d = data_generator.get_data_2d(px, pz);
-            cubes.push(render_cube(data_generator, &data2d, (px, pz, py), cube_size));
+            cubes.push(render_cube(
+                data_generator,
+                &data2d,
+                (px, pz, py),
+                cube_size,
+            ));
             return cubes;
         }
     }
@@ -110,7 +101,12 @@ fn subdivide_cube(
                 let data2d = data_generator.get_data_2d(c_pos_x, c_pos_z);
                 let is_inside = data_generator.get_data_3d(&data2d, c_pos_x, c_pos_z, c_pos_y);
                 if !is_inside {
-                    local_cubes.push(render_cube(data_generator, &data2d, corner_pos, half_cube_size));
+                    local_cubes.push(render_cube(
+                        data_generator,
+                        &data2d,
+                        corner_pos,
+                        half_cube_size,
+                    ));
                 }
             } else {
                 local_cubes = subdivide_cube(data_generator, corner_pos, half_cube_size);

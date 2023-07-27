@@ -16,7 +16,6 @@ use smooth_bevy_cameras::{
     LookTransformPlugin,
 };
 
-mod block;
 mod chunks;
 mod render;
 mod subdivision;
@@ -41,7 +40,6 @@ fn main() {
         .add_plugins((LookTransformPlugin, UnrealCameraPlugin::default()))
         .add_systems(Startup, setup)
         .add_systems(Startup, chunks::chunk_search)
-        // .add_systems(Startup, block::setup)
         .add_systems(Update, screen_print_text)
         .run();
 }

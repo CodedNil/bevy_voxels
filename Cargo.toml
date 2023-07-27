@@ -6,7 +6,6 @@ edition = "2021"
 [dependencies]
 bevy = "0.11.0"
 bevy-debug-text-overlay = "6.0.0"
-block-mesh = { git = "https://github.com/bonsairobo/block-mesh-rs/" }
 noise = "0.8.2"
 rand = "0.8.5"
 rayon = "1.7.0"

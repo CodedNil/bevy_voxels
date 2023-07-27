@@ -1,7 +1,7 @@
-use crate::block;
 use crate::subdivision::chunk_render;
 use crate::world_noise;
 use bevy::prelude::*;
+use rayon::prelude::*;
 
 pub const CHUNK_SIZE: f32 = 8.0;
 const RENDER_DISTANCE: usize = 8;
@@ -73,37 +73,38 @@ pub fn chunk_search(
                 }
 
                 // Render chunk
-                for y in [0, -1, 1, 2] {
-                    let chunk = chunk_render(
-                        &mut commands,
-                        &mut meshes,
-                        &mut materials,
-                        &data_generator,
-                        Vec3::new(
-                            next_chunk.0 as f32,
-                            y as f32 * CHUNK_SIZE,
-                            next_chunk.1 as f32,
-                        ),
-                        CHUNK_SIZE,
-                    );
+                let results: Vec<_> = [0, -1, 1, 2]
+                    .par_iter()
+                    .map(|&y| {
+                        chunk_render(
+                            &data_generator,
+                            (
+                                next_chunk.0 as f32,
+                                next_chunk.1 as f32,
+                                y as f32 * CHUNK_SIZE,
+                            ),
+                            CHUNK_SIZE,
+                        )
+                    })
+                    .collect();
+                // Sum up the results from all threads
+                for chunk in results {
                     total += 1;
                     cubes += chunk.n_cubes;
                     triangles += chunk.n_triangles;
 
-                    // let chunk = block::render_chunk(
-                    //     &data_generator,
-                    //     &mut commands,
-                    //     &mut meshes,
-                    //     &mut materials,
-                    //     Vec3::new(
-                    //         next_chunk.0 as f32,
-                    //         y as f32 * CHUNK_SIZE,
-                    //         next_chunk.1 as f32,
-                    //     ),
-                    // );
-                    // total += 1;
-                    // cubes += chunk.n_cubes;
-                    // triangles += chunk.n_triangles;
+                    let (chunk_x, chunk_z, chunk_y) = chunk.chunk_pos;
+                    commands.spawn(PbrBundle {
+                        mesh: meshes.add(chunk.mesh),
+                        material: materials.add(StandardMaterial {
+                            base_color: Color::WHITE,
+                            metallic: 0.8,
+                            perceptual_roughness: 0.3,
+                            ..default()
+                        }),
+                        transform: Transform::from_xyz(chunk_x, chunk_y, chunk_z),
+                        ..Default::default()
+                    });
                 }
             }
         }

@@ -1,4 +1,3 @@
-use bevy::prelude::*;
 use noise::{NoiseFn, OpenSimplex};
 use std::f32::consts::PI;
 
@@ -23,9 +22,9 @@ pub struct Data2D {
 }
 
 pub struct DataColor {
-    pub color: Color,
+    pub color: (f32, f32, f32),
     pub material: String,
-    pub pos_jittered: Vec3,
+    pub pos_jittered: (f32, f32, f32),
 }
 
 #[allow(clippy::cast_possible_truncation)]
@@ -153,22 +152,34 @@ impl DataGenerator {
     pub fn get_data_color(&self, data2d: &Data2D, x: f32, z: f32, y: f32) -> DataColor {
         // Color from dark to light gray as elevation increases
         let shade: f32 = y / 50.0;
-        let rock_color = Color::rgb(0.8, 0.6, 0.3);
-        let mut color = rock_color + Color::rgb(shade, shade, shade);
+        let rock_color: (f32, f32, f32) = (0.8, 0.6, 0.3);
+        let color: (f32, f32, f32) = (
+            rock_color.0 + shade,
+            rock_color.1 + shade,
+            rock_color.2 + shade,
+        );
         let material = "standard".to_string();
 
         // Give the color horizontal lines from noise to make it look more natural
         let noise_shade: f32 = 0.1 + self.get_noise(y * 20.0 + x * 0.01 + z + 0.01) * 0.1;
-        color += Color::rgb(noise_shade, noise_shade, noise_shade);
+        let color = (
+            color.0 + noise_shade,
+            color.1 + noise_shade,
+            color.2 + noise_shade,
+        );
         // Add brown colors based on 2d noise
         let noise_color = 0.5 + self.get_world_noise2d(0.0, 0.1, x, z) / 2.0;
-        color += Color::rgb(noise_color, noise_color * 0.5, 0.0) * 0.1;
+        let color = (
+            color.0 + noise_color * 0.1,
+            color.1 + noise_color * 0.05,
+            color.2,
+        );
 
         // Jitter the position with noise to make it look more natural
-        let pos_jittered = Vec3::new(
+        let pos_jittered = (
             x + (self.get_noise2d(z, y) * 0.2),
-            y + data2d.elevation,
             z + (self.get_noise2d(x, y) * 0.2),
+            y + data2d.elevation,
         );
 
         DataColor {
