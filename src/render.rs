@@ -2,6 +2,23 @@ use crate::subdivision::Cube;
 use bevy::prelude::*;
 use bevy::render::{mesh::Indices, render_resource::PrimitiveTopology};
 
+const FACES: [[usize; 6]; 6] = [
+    [2, 1, 0, 3, 1, 2], // Front face
+    [4, 5, 6, 6, 5, 7], // Back face
+    [2, 0, 4, 4, 6, 2], // Top face
+    [1, 3, 5, 3, 7, 5], // Bottom face
+    [0, 1, 5, 5, 4, 0], // Left face
+    [3, 2, 6, 6, 7, 3], // Right face
+];
+const FACE_NORMALS: [[f32; 3]; 6] = [
+    [0.0, 0.0, 1.0],  // Front face
+    [0.0, 0.0, -1.0], // Back face
+    [0.0, 1.0, 0.0],  // Top face
+    [0.0, -1.0, 0.0], // Bottom face
+    [1.0, 0.0, 0.0],  // Left face
+    [-1.0, 0.0, 0.0], // Right face
+];
+
 #[allow(clippy::cast_possible_truncation)]
 pub fn cubes(cubes: &Vec<Cube>, pos: Vec3) -> (Mesh, usize) {
     // Gather triangles for rendering
@@ -10,23 +27,6 @@ pub fn cubes(cubes: &Vec<Cube>, pos: Vec3) -> (Mesh, usize) {
     let mut normals: Vec<[f32; 3]> = Vec::with_capacity(n * 36);
     let mut colors: Vec<[f32; 4]> = Vec::with_capacity(n * 36);
     let mut indices: Vec<u32> = Vec::with_capacity(n * 36);
-
-    let faces = [
-        [2, 1, 0, 3, 1, 2], // Front face
-        [4, 5, 6, 6, 5, 7], // Back face
-        [2, 0, 4, 4, 6, 2], // Top face
-        [1, 3, 5, 3, 7, 5], // Bottom face
-        [0, 1, 5, 5, 4, 0], // Left face
-        [3, 2, 6, 6, 7, 3], // Right face
-    ];
-    let face_normals = [
-        [0.0, 0.0, 1.0],  // Front face
-        [0.0, 0.0, -1.0], // Back face
-        [0.0, 1.0, 0.0],  // Top face
-        [0.0, -1.0, 0.0], // Bottom face
-        [1.0, 0.0, 0.0],  // Left face
-        [-1.0, 0.0, 0.0], // Right face
-    ];
 
     for (i, cube) in cubes.iter().enumerate() {
         let half_size = cube.size / 2.0;
@@ -55,8 +55,8 @@ pub fn cubes(cubes: &Vec<Cube>, pos: Vec3) -> (Mesh, usize) {
         // Loop over each face of the cube
         let base_index = (i * 36) as u32;
         for face_index in 0..6 {
-            let current_face = faces[face_index];
-            let current_normal = face_normals[face_index];
+            let current_face = FACES[face_index];
+            let current_normal = FACE_NORMALS[face_index];
 
             // Loop over each vertex of the face
             for vertex_index in 0..6 {

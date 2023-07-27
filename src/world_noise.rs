@@ -170,9 +170,9 @@ impl DataGenerator {
 
         // Jitter the position with noise to make it look more natural
         let pos_jittered = Vec3::new(
-            x + (self.get_noise2d(z, y) * 0.5),
+            x + (self.get_noise2d(z, y) * 0.2),
             y + data2d.elevation,
-            z + (self.get_noise2d(x, y) * 0.5),
+            z + (self.get_noise2d(x, y) * 0.2),
         );
 
         DataColor {
