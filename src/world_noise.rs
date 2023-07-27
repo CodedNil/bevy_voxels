@@ -44,25 +44,21 @@ impl DataGenerator {
         self.world_noise.get([x as f64, z as f64]) as f32
     }
     pub fn get_world_noise(&self, offset: f64, scale: f64, x: f32) -> f32 {
-        let val = self
-            .world_noise
-            .get([offset * 1000.0, x as f64 * scale * 0.1]);
+        let val = self.world_noise.get([offset * 1000.0, x as f64 * scale]);
 
         ((1.0 + (val * 1.4)) * 0.5).clamp(0.0, 1.0) as f32
     }
     pub fn get_world_noise2d(&self, offset: f64, scale: f64, x: f32, z: f32) -> f32 {
-        let val = self.world_noise.get([
-            offset * 1000.0,
-            x as f64 * scale * 0.1,
-            z as f64 * scale * 0.1,
-        ]);
+        let val = self
+            .world_noise
+            .get([offset * 1000.0, x as f64 * scale, z as f64 * scale]);
 
         ((1.0 + (val * 1.4)) * 0.5).clamp(0.0, 1.0) as f32
     }
 
     pub fn get_data_2d(&self, x: f32, z: f32) -> Data2D {
-        let elevation = self.get_world_noise2d(0.0, 0.1, x, z) * 5.0;
-        let smoothness = self.get_world_noise2d(1.0, 0.1, x, z);
+        let elevation = self.get_world_noise2d(0.0, 0.01, x, z) * 5.0;
+        let smoothness = self.get_world_noise2d(1.0, 0.01, x, z);
 
         let room_spacing = 150.0;
 
@@ -77,8 +73,8 @@ impl DataGenerator {
 
         // Get position offset by noise, so it is not on a perfect grid
         let horizontal_offset = [
-            self.get_world_noise(2.0, 0.25, z / 4.0) * (room_spacing / 3.0),
-            self.get_world_noise(3.0, 0.25, x / 4.0) * (room_spacing / 3.0),
+            self.get_world_noise(2.0, 0.025, z / 4.0) * (room_spacing / 3.0),
+            self.get_world_noise(3.0, 0.025, x / 4.0) * (room_spacing / 3.0),
         ];
         let room_position = [
             room_position[0] + horizontal_offset[0],
@@ -95,7 +91,7 @@ impl DataGenerator {
             + self.get_noise(room_seed) * lerp(15.0, 2.0, smoothness))
             + self.get_world_noise2d(
                 4.0,
-                0.1,
+                0.01,
                 x * lerp(20.0, 4.0, smoothness),
                 z * lerp(20.0, 4.0, smoothness),
             ) * 40.0;
@@ -119,8 +115,8 @@ impl DataGenerator {
             .abs();
 
         // Higher numbers reduce the height exponentially
-        let room_floor = 8.0 - self.get_world_noise2d(5.0, 0.1, x, z) * 4.0;
-        let room_ceiling = 2.0 + self.get_world_noise2d(6.0, 0.1, x, z) * 3.0;
+        let room_floor = 8.0 - self.get_world_noise2d(5.0, 0.01, x, z) * 4.0;
+        let room_ceiling = 2.0 + self.get_world_noise2d(6.0, 0.01, x, z) * 3.0;
 
         Data2D {
             elevation,

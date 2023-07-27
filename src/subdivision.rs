@@ -1,5 +1,5 @@
 use crate::render;
-use crate::world_noise;
+use crate::world_noise::{Data2D, DataGenerator};
 use bevy::prelude::*;
 use rayon::prelude::*;
 
@@ -21,12 +21,12 @@ pub fn chunk_render(
     commands: &mut Commands,
     meshes: &mut ResMut<Assets<Mesh>>,
     materials: &mut ResMut<Assets<StandardMaterial>>,
-    data_generator: &world_noise::DataGenerator,
+    data_generator: &DataGenerator,
     pos: Vec3,
     chunk_size: f32,
 ) -> Chunk {
     // Subdivide the cube and store the result in the cubes vector
-    let cubes: Vec<Cube> = subdivide_cube(data_generator, pos, chunk_size);
+    let cubes: Vec<Cube> = subdivide_cube(data_generator, (pos.x, pos.z, pos.y), chunk_size);
 
     // Render the mesh
     let (render_mesh, n_triangles) = render::cubes(&cubes, pos);
@@ -48,11 +48,13 @@ pub fn chunk_render(
     }
 }
 
+#[allow(clippy::cast_precision_loss)]
 fn subdivide_cube(
-    data_generator: &world_noise::DataGenerator,
-    pos3d: Vec3,
+    data_generator: &DataGenerator,
+    pos: (f32, f32, f32),
     cube_size: f32,
 ) -> Vec<Cube> {
+    let (px, pz, py) = pos;
     let mut cubes: Vec<Cube> = Vec::new();
 
     let half_cube_size = cube_size / 2.0;
@@ -69,10 +71,10 @@ fn subdivide_cube(
             _ => 0,
         };
 
-        for x in [pos3d.x - half_cube_size, pos3d.x + half_cube_size] {
-            for z in [pos3d.z - half_cube_size, pos3d.z + half_cube_size] {
+        for x in [px - half_cube_size, px + half_cube_size] {
+            for z in [pz - half_cube_size, pz + half_cube_size] {
                 let data2d = data_generator.get_data_2d(x, z);
-                for y in [pos3d.y - half_cube_size, pos3d.y + half_cube_size] {
+                for y in [py - half_cube_size, py + half_cube_size] {
                     let is_inside = data_generator.get_data_3d(&data2d, x, z, y);
                     if is_inside {
                         n_air_cubes += 1;
@@ -86,39 +88,32 @@ fn subdivide_cube(
         }
         // If air cubes in threshold range, render it
         if n_air_cubes <= max_air_cubes {
-            let data2d = data_generator.get_data_2d(pos3d.x, pos3d.z);
-            let cube = render_cube(data_generator, &data2d, pos3d, cube_size);
-            cubes.push(cube);
+            let data2d = data_generator.get_data_2d(px, pz);
+            cubes.push(render_cube(data_generator, &data2d, (px, pz, py), cube_size));
             return cubes;
         }
     }
 
     // Otherwise, subdivide it into 8 smaller cubes
-    let mut sub_cubes_positions = Vec::with_capacity(8);
-    for x in [pos3d.x - quarter_cube_size, pos3d.x + quarter_cube_size] {
-        for z in [pos3d.z - quarter_cube_size, pos3d.z + quarter_cube_size] {
-            for y in [pos3d.y - quarter_cube_size, pos3d.y + quarter_cube_size] {
-                sub_cubes_positions.push([x, z, y]);
-            }
-        }
-    }
-    let sub_cubes_positions = sub_cubes_positions;
+    let new_cubes: Vec<Cube> = (0..8)
+        .into_par_iter()
+        .flat_map(|i| {
+            let corner_pos = (
+                px + ((i & 1) * 2 - 1) as f32 * quarter_cube_size,
+                pz + ((i >> 1 & 1) * 2 - 1) as f32 * quarter_cube_size,
+                py + ((i >> 2 & 1) * 2 - 1) as f32 * quarter_cube_size,
+            );
+            let (c_pos_x, c_pos_z, c_pos_y) = corner_pos;
 
-    let new_cubes: Vec<Cube> = sub_cubes_positions
-        .par_iter()
-        .flat_map(|&pos| {
             let mut local_cubes: Vec<Cube> = Vec::new();
             if half_cube_size < SMALLEST_CUBE_SIZE {
-                let data2d = data_generator.get_data_2d(pos[0], pos[1]);
-                let is_inside = data_generator.get_data_3d(&data2d, pos[0], pos[1], pos[2]);
+                let data2d = data_generator.get_data_2d(c_pos_x, c_pos_z);
+                let is_inside = data_generator.get_data_3d(&data2d, c_pos_x, c_pos_z, c_pos_y);
                 if !is_inside {
-                    let pos_vec3 = Vec3::new(pos[0], pos[2], pos[1]);
-                    let cube = render_cube(data_generator, &data2d, pos_vec3, half_cube_size);
-                    local_cubes.push(cube);
+                    local_cubes.push(render_cube(data_generator, &data2d, corner_pos, half_cube_size));
                 }
             } else {
-                let pos_vec3 = Vec3::new(pos[0], pos[2], pos[1]);
-                local_cubes = subdivide_cube(data_generator, pos_vec3, half_cube_size);
+                local_cubes = subdivide_cube(data_generator, corner_pos, half_cube_size);
             }
             local_cubes.into_par_iter()
         })
@@ -129,12 +124,13 @@ fn subdivide_cube(
 }
 
 fn render_cube(
-    data_generator: &world_noise::DataGenerator,
-    data2d: &world_noise::Data2D,
-    pos: Vec3,
+    data_generator: &DataGenerator,
+    data2d: &Data2D,
+    pos: (f32, f32, f32),
     size: f32,
 ) -> Cube {
-    let data_color = data_generator.get_data_color(data2d, pos.x, pos.z, pos.y);
+    let (px, pz, py) = pos;
+    let data_color = data_generator.get_data_color(data2d, px, pz, py);
     Cube {
         pos: data_color.pos_jittered,
         size: size * 1.175,
