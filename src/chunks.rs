@@ -1,9 +1,9 @@
 use crate::subdivision::chunk_render;
 use crate::world_noise;
 use bevy::prelude::*;
-use std::collections::HashSet;
+use std::collections::VecDeque;
 
-pub const CHUNK_SIZE: f32 = 4.0;
+pub const CHUNK_SIZE: usize = 4;
 const RENDER_DISTANCE: usize = 16;
 
 /// Chunk search algorithm to generate chunks around the player
@@ -24,87 +24,85 @@ pub fn chunk_search(
     // Make world noise data generator
     let data_generator = world_noise::DataGenerator::new();
 
-    let mut rendered_chunks = HashSet::new();
-    let mut filled_chunks = HashSet::new();
+    let mut queue = VecDeque::new();
+    let mut visited =
+        vec![vec![vec![false; RENDER_DISTANCE * 2]; RENDER_DISTANCE * 2]; RENDER_DISTANCE * 2];
 
-    // Get every direction of sphere
-    let step = 1;
-    let pi_over_180 = std::f32::consts::PI / 180.0;
-    let render_distance_f32 = RENDER_DISTANCE as f32;
-    for phi in (0..180).step_by(step) {
-        let phi_rad = phi as f32 * pi_over_180;
-        let phi_sin = phi_rad.sin();
-        let phi_cos = phi_rad.cos();
+    queue.push_back((0, 0, 0));
+    visited[RENDER_DISTANCE / 2][RENDER_DISTANCE / 2][RENDER_DISTANCE / 2] = true;
 
-        for theta in (0..360).step_by(step) {
-            let theta_rad = theta as f32 * pi_over_180;
-            let theta_cos = theta_rad.cos();
-            let theta_sin = theta_rad.sin();
+    let directions = [
+        (-1, 0, 0),
+        (1, 0, 0),
+        (0, -1, 0),
+        (0, 1, 0),
+        (0, 0, -1),
+        (0, 0, 1),
+    ];
 
-            // Get border of render distance
-            let border_x = (render_distance_f32 * phi_sin * theta_cos).round() as i32;
-            let border_y = (render_distance_f32 * phi_sin * theta_sin).round() as i32;
-            let border_z = (render_distance_f32 * phi_cos).round() as i32;
+    while let Some(chunk) = queue.pop_front() {
+        for &direction in &directions {
+            let neighbor = (
+                chunk.0 + direction.0,
+                chunk.1 + direction.1,
+                chunk.2 + direction.2,
+            );
 
-            // Iterate towards the border from the origin in steps of chunk size
-            let direction = Vec3::new(
-                border_x as f32 * CHUNK_SIZE,
-                border_y as f32 * CHUNK_SIZE,
-                border_z as f32 * CHUNK_SIZE,
-            )
-            .normalize()
-                * CHUNK_SIZE;
-            for distance in 0..RENDER_DISTANCE {
-                let current_pos = direction * distance as f32;
+            let voxel = (
+                neighbor.0 + RENDER_DISTANCE as i32,
+                neighbor.1 + RENDER_DISTANCE as i32,
+                neighbor.2 + RENDER_DISTANCE as i32,
+            );
 
-                let current_chunk_x = (current_pos.x / CHUNK_SIZE).round() * CHUNK_SIZE;
-                let current_chunk_y = (current_pos.y / CHUNK_SIZE).round() * CHUNK_SIZE;
-                let current_chunk_z = (current_pos.z / CHUNK_SIZE).round() * CHUNK_SIZE;
+            if voxel.0 < 0
+                || voxel.1 < 0
+                || voxel.2 < 0
+                || voxel.0 >= RENDER_DISTANCE as i32 * 2
+                || voxel.1 >= RENDER_DISTANCE as i32 * 2
+                || voxel.2 >= RENDER_DISTANCE as i32 * 2
+            {
+                continue;
+            }
 
-                // If filled chunk, break, if rendered chunk, continue
-                let key = (
-                    current_chunk_x as i32,
-                    current_chunk_y as i32,
-                    current_chunk_z as i32,
-                );
-                if filled_chunks.contains(&key) {
-                    break;
-                }
-                if !rendered_chunks.insert(key) {
-                    continue;
-                }
+            if visited[voxel.0 as usize][voxel.1 as usize][voxel.2 as usize] {
+                continue;
+            }
+            visited[voxel.0 as usize][voxel.1 as usize][voxel.2 as usize] = true;
 
-                let chunk = chunk_render(
-                    &data_generator,
-                    (current_chunk_x, current_chunk_z, current_chunk_y),
-                    CHUNK_SIZE,
-                );
-                if chunk.n_cubes != 0 {
-                    total += 1;
-                    cubes += chunk.n_cubes;
-                    triangles += chunk.n_triangles;
+            let render_result = chunk_render(
+                &data_generator,
+                (
+                    neighbor.0 as f32 * CHUNK_SIZE as f32,
+                    neighbor.2 as f32 * CHUNK_SIZE as f32,
+                    neighbor.1 as f32 * CHUNK_SIZE as f32,
+                ),
+                CHUNK_SIZE as f32,
+            );
+            let blocking = render_result.n_cubes == 1;
 
-                    commands.spawn(PbrBundle {
-                        mesh: meshes.add(chunk.mesh),
-                        material: materials.add(StandardMaterial {
-                            base_color: Color::WHITE,
-                            metallic: 0.8,
-                            perceptual_roughness: 0.3,
-                            ..default()
-                        }),
-                        transform: Transform::from_xyz(
-                            current_chunk_x,
-                            current_chunk_y,
-                            current_chunk_z,
-                        ),
-                        ..Default::default()
-                    });
-                }
+            cubes += render_result.n_cubes;
+            triangles += render_result.n_triangles;
 
-                if chunk.n_cubes == 1 {
-                    filled_chunks.insert(key);
-                    break;
-                }
+            commands.spawn(PbrBundle {
+                mesh: meshes.add(render_result.mesh),
+                material: materials.add(StandardMaterial {
+                    base_color: Color::WHITE,
+                    metallic: 0.8,
+                    perceptual_roughness: 0.3,
+                    ..default()
+                }),
+                transform: Transform::from_xyz(
+                    neighbor.0 as f32 * CHUNK_SIZE as f32,
+                    neighbor.1 as f32 * CHUNK_SIZE as f32,
+                    neighbor.2 as f32 * CHUNK_SIZE as f32,
+                ),
+                ..Default::default()
+            });
+
+            total += 1;
+
+            if !blocking {
+                queue.push_back(neighbor);
             }
         }
     }
