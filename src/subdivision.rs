@@ -3,7 +3,7 @@ use crate::world_noise::{Data2D, DataGenerator};
 use bevy::prelude::*;
 use rayon::prelude::*;
 
-const LARGEST_CUBE_SIZE: f32 = 2.0;
+const LARGEST_CUBE_SIZE: f32 = 4.0;
 const SMALLEST_CUBE_SIZE: f32 = 0.25;
 
 pub struct Cube {
