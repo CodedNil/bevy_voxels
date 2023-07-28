@@ -14,18 +14,20 @@ pub struct Cube {
 
 pub struct Chunk {
     pub mesh: Mesh,
-    pub chunk_pos: (f32, f32, f32),
+    pub chunk_pos: (i32, i32, i32),
     pub n_cubes: usize,
     pub n_triangles: usize,
 }
 
+#[allow(clippy::cast_precision_loss)]
 pub fn chunk_render(
     data_generator: &DataGenerator,
-    chunk_pos: (f32, f32, f32),
-    chunk_size: f32,
+    chunk_pos: (i32, i32, i32),
+    chunk_size: usize,
 ) -> Chunk {
-    let cubes: Vec<Cube> = subdivide_cube(data_generator, chunk_pos, chunk_size);
-    let (render_mesh, n_triangles) = render::cubes_mesh(&cubes, chunk_pos);
+    let chunk_pos_f32 = (chunk_pos.0 as f32, chunk_pos.1 as f32, chunk_pos.2 as f32);
+    let cubes: Vec<Cube> = subdivide_cube(data_generator, chunk_pos_f32, chunk_size as f32);
+    let (render_mesh, n_triangles) = render::cubes_mesh(&cubes, chunk_pos_f32);
     Chunk {
         mesh: render_mesh,
         chunk_pos,
@@ -37,10 +39,10 @@ pub fn chunk_render(
 #[allow(clippy::cast_precision_loss)]
 fn subdivide_cube(
     data_generator: &DataGenerator,
-    chunk_pos: (f32, f32, f32),
+    cube_pos: (f32, f32, f32),
     cube_size: f32,
 ) -> Vec<Cube> {
-    let (px, pz, py) = chunk_pos;
+    let (px, pz, py) = cube_pos;
     let mut cubes: Vec<Cube> = Vec::new();
 
     let half_cube_size = cube_size / 2.0;
