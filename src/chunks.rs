@@ -1,7 +1,6 @@
 use crate::subdivision::{chunk_render, Chunk};
 use crate::world_noise;
 use bevy::prelude::*;
-use rayon::prelude::*;
 use std::collections::VecDeque;
 
 pub const CHUNK_SIZE: usize = 4;
@@ -15,6 +14,8 @@ struct ExploreResult {
 
 /// Chunk search algorithm to generate chunks around the player
 #[allow(clippy::cast_precision_loss)]
+#[allow(clippy::cast_possible_truncation)]
+#[allow(clippy::cast_possible_wrap)]
 pub fn chunk_search(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
@@ -27,11 +28,12 @@ pub fn chunk_search(
 
     // Initialize state
     let mut queue = VecDeque::new();
-    let mut visited =
-        vec![vec![vec![false; RENDER_DISTANCE * 2]; RENDER_DISTANCE * 2]; RENDER_DISTANCE * 2];
+    let mut visited = vec![
+        vec![vec![false; RENDER_DISTANCE * 2 + 1]; RENDER_DISTANCE * 2 + 1];
+        RENDER_DISTANCE * 2 + 1
+    ];
 
     queue.push_back((0, 0, 0));
-    visited[RENDER_DISTANCE / 2][RENDER_DISTANCE / 2][RENDER_DISTANCE / 2] = true;
 
     let mut chunks: Vec<Chunk> = Vec::new();
     while let Some(chunk) = queue.pop_front() {
@@ -51,7 +53,7 @@ pub fn chunk_search(
     let total = chunks.len();
     let mut cubes = 0;
     let mut triangles = 0;
-    
+
     for chunk in chunks {
         commands.spawn(PbrBundle {
             mesh: meshes.add(chunk.mesh),
@@ -96,8 +98,10 @@ fn explore_chunk(
     let mut chunks = Vec::new();
 
     // Create empty visited and queue to add new data to
-    let mut new_visited =
-        vec![vec![vec![false; RENDER_DISTANCE * 2]; RENDER_DISTANCE * 2]; RENDER_DISTANCE * 2];
+    let mut new_visited = vec![
+        vec![vec![false; RENDER_DISTANCE * 2 + 1]; RENDER_DISTANCE * 2 + 1];
+        RENDER_DISTANCE * 2 + 1
+    ];
     let mut new_queue = VecDeque::new();
 
     for &direction in &directions {
@@ -106,29 +110,37 @@ fn explore_chunk(
             chunk_y + direction.1,
             chunk_z + direction.2,
         );
-
-        let voxel = (
+        // Get position in visited array
+        let neighbor_normalised = (
             neighbor.0 + RENDER_DISTANCE as i32,
             neighbor.1 + RENDER_DISTANCE as i32,
             neighbor.2 + RENDER_DISTANCE as i32,
         );
 
-        let is_out_of_bounds = voxel.0 < 0
-            || voxel.1 < 0
-            || voxel.2 < 0
-            || voxel.0 >= RENDER_DISTANCE as i32 * 2
-            || voxel.1 >= RENDER_DISTANCE as i32 * 2
-            || voxel.2 >= RENDER_DISTANCE as i32 * 2;
-
+        let is_out_of_bounds = neighbor_normalised.0 < 0
+            || neighbor_normalised.1 < 0
+            || neighbor_normalised.2 < 0
+            || neighbor_normalised.0 > RENDER_DISTANCE as i32 * 2
+            || neighbor_normalised.1 > RENDER_DISTANCE as i32 * 2
+            || neighbor_normalised.2 > RENDER_DISTANCE as i32 * 2;
         if is_out_of_bounds {
             continue;
         }
-        let is_visited1 = visited[voxel.0 as usize][voxel.1 as usize][voxel.2 as usize];
-        let is_visited2 = new_visited[voxel.0 as usize][voxel.1 as usize][voxel.2 as usize];
+        let is_visited1 = visited[neighbor_normalised.0 as usize][neighbor_normalised.1 as usize]
+            [neighbor_normalised.2 as usize];
+        let is_visited2 = new_visited[neighbor_normalised.0 as usize]
+            [neighbor_normalised.1 as usize][neighbor_normalised.2 as usize];
         if is_visited1 || is_visited2 {
             continue;
         }
-        new_visited[voxel.0 as usize][voxel.1 as usize][voxel.2 as usize] = true;
+        // Calculate the distance from the origin, only create the chunk if it's within the render distance
+        let distance = ((neighbor.0.pow(2) + neighbor.1.pow(2) + neighbor.2.pow(2)) as f32).sqrt();
+        if distance > RENDER_DISTANCE as f32 {
+            continue;
+        }
+
+        new_visited[neighbor_normalised.0 as usize][neighbor_normalised.1 as usize]
+            [neighbor_normalised.2 as usize] = true;
 
         let chunk = chunk_render(
             data_generator,
@@ -139,9 +151,13 @@ fn explore_chunk(
             ),
             CHUNK_SIZE,
         );
-        let blocking = chunk.n_cubes == 1;
-        chunks.push(chunk);
 
+        let blocking = chunk.n_cubes == 1;
+        // If chunk is empty don't render it
+        if chunk.n_cubes > 0 {
+            chunks.push(chunk);
+        }
+        // If chunk is blocking, don't explore it further
         if !blocking {
             new_queue.push_back(neighbor);
         }
