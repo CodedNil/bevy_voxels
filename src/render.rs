@@ -37,7 +37,7 @@ struct CubeFace {
 
 #[derive(Clone)]
 struct Face {
-    vertices: [Vec3; 4],
+    vertices: [Vec3; 8],
     tris: [[Vec3; 3]; 2],
     color: [f32; 4],
 }
@@ -56,7 +56,7 @@ struct Ray {
 
 pub fn cubes_mesh(cubes: &Vec<Cube>, chunk_pos: (f32, f32, f32)) -> (Mesh, usize) {
     let (cube_faces, min_pos, max_pos) = generate_cube_faces(cubes, chunk_pos);
-    let cube_faces = perform_raycasts2(&cube_faces, min_pos, max_pos);
+    let cube_faces = perform_raycasts(&cube_faces, min_pos, max_pos);
     let mesh_data = generate_mesh_data(&cube_faces, cubes.len());
 
     let n_triangles = mesh_data.indices.len() / 3;
@@ -132,6 +132,10 @@ fn generate_cube_faces(
                     corners[verts[1]],
                     corners[verts[2]],
                     corners[verts[3]],
+                    (corners[verts[0]] + corners[verts[1]]) / 2.0,
+                    (corners[verts[1]] + corners[verts[2]]) / 2.0,
+                    (corners[verts[2]] + corners[verts[3]]) / 2.0,
+                    (corners[verts[3]] + corners[verts[0]]) / 2.0,
                 ],
                 tris: [
                     [
@@ -153,211 +157,56 @@ fn generate_cube_faces(
     (cube_faces, min_pos, max_pos)
 }
 
-#[allow(clippy::ptr_arg)]
-#[allow(clippy::too_many_lines)]
-fn perform_raycasts(cube_faces: &Vec<CubeFace>, min_pos: Vec3, max_pos: Vec3) -> Vec<CubeFace> {
-    // Get max size of the shape and shape center
+fn perform_raycasts(cube_faces: &[CubeFace], min_pos: Vec3, max_pos: Vec3) -> Vec<CubeFace> {
     let max_size = (max_pos - min_pos).max_element();
     let shape_center = (max_pos + min_pos) / 2.0;
 
-    let front_faces = &cube_faces[0].faces;
-    let back_faces = &cube_faces[1].faces;
-    let mut new_front_faces: HashSet<usize> = HashSet::new();
-    let mut new_back_faces: HashSet<usize> = HashSet::new();
+    let directions = [
+        Vec3::new(0.0, 0.0, -1.0),
+        Vec3::new(0.0, 0.0, 1.0),
+        Vec3::new(0.0, -1.0, 0.0),
+        Vec3::new(0.0, 1.0, 0.0),
+        Vec3::new(-1.0, 0.0, 0.0),
+        Vec3::new(1.0, 0.0, 0.0),
+    ];
+    let origins = [
+        Vec3::new(0.0, 0.0, shape_center.z + max_size / 2.0 + 1.0),
+        Vec3::new(0.0, 0.0, shape_center.z - max_size / 2.0 - 1.0),
+        Vec3::new(0.0, shape_center.y + max_size / 2.0 + 1.0, 0.0),
+        Vec3::new(0.0, shape_center.y - max_size / 2.0 - 1.0, 0.0),
+        Vec3::new(shape_center.x + max_size / 2.0 + 1.0, 0.0, 0.0),
+        Vec3::new(shape_center.x - max_size / 2.0 - 1.0, 0.0, 0.0),
+    ];
 
-    let top_faces = &cube_faces[2].faces;
-    let bottom_faces = &cube_faces[3].faces;
-    let mut new_top_faces: HashSet<usize> = HashSet::new();
-    let mut new_bottom_faces: HashSet<usize> = HashSet::new();
-
-    let left_faces = &cube_faces[4].faces;
-    let right_faces = &cube_faces[5].faces;
-    let mut new_left_faces: HashSet<usize> = HashSet::new();
-    let mut new_right_faces: HashSet<usize> = HashSet::new();
-
-    // Cast a ray at each corner of every face
-    for face in front_faces {
-        for vertex in &face.vertices {
-            let front_ray = Ray {
-                origin: Vec3::new(vertex.x, vertex.y, shape_center.z + max_size / 2.0 + 1.0),
-                direction: Vec3::new(0.0, 0.0, -1.0),
-            };
-            if let Some(hit_face) = raycast_mesh(&front_ray, front_faces) {
-                new_front_faces.insert(hit_face);
-            }
-        }
-    }
-    for face in back_faces {
-        for vertex in &face.vertices {
-            let back_ray = Ray {
-                origin: Vec3::new(vertex.x, vertex.y, shape_center.z - max_size / 2.0 - 1.0),
-                direction: Vec3::new(0.0, 0.0, 1.0),
-            };
-            if let Some(hit_face) = raycast_mesh(&back_ray, back_faces) {
-                new_back_faces.insert(hit_face);
-            }
-        }
-    }
-    for face in top_faces {
-        for vertex in &face.vertices {
-            let top_ray = Ray {
-                origin: Vec3::new(vertex.x, shape_center.y + max_size / 2.0 + 1.0, vertex.z),
-                direction: Vec3::new(0.0, -1.0, 0.0),
-            };
-            if let Some(hit_face) = raycast_mesh(&top_ray, top_faces) {
-                new_top_faces.insert(hit_face);
-            }
-        }
-    }
-    for face in bottom_faces {
-        for vertex in &face.vertices {
-            let bottom_ray = Ray {
-                origin: Vec3::new(vertex.x, shape_center.y - max_size / 2.0 - 1.0, vertex.z),
-                direction: Vec3::new(0.0, 1.0, 0.0),
-            };
-            if let Some(hit_face) = raycast_mesh(&bottom_ray, bottom_faces) {
-                new_bottom_faces.insert(hit_face);
-            }
-        }
-    }
-    for face in left_faces {
-        for vertex in &face.vertices {
-            let left_ray = Ray {
-                origin: Vec3::new(shape_center.x + max_size / 2.0 + 1.0, vertex.y, vertex.z),
-                direction: Vec3::new(-1.0, 0.0, 0.0),
-            };
-            if let Some(hit_face) = raycast_mesh(&left_ray, left_faces) {
-                new_left_faces.insert(hit_face);
-            }
-        }
-    }
-    for face in right_faces {
-        for vertex in &face.vertices {
-            let right_ray = Ray {
-                origin: Vec3::new(shape_center.x - max_size / 2.0 - 1.0, vertex.y, vertex.z),
-                direction: Vec3::new(1.0, 0.0, 0.0),
-            };
-            if let Some(hit_face) = raycast_mesh(&right_ray, right_faces) {
-                new_right_faces.insert(hit_face);
-            }
-        }
-    }
-
-    // Replace faces with new right faces
-    let mut new_cube_faces: Vec<CubeFace> = Vec::with_capacity(6);
-    // Add the faces with the normals
-    for cube_face in cube_faces {
-        new_cube_faces.push(CubeFace {
-            faces: Vec::new(),
-            normal: cube_face.normal,
-        });
-    }
-
-    // Add the faces that were hit
-    for face_index in new_front_faces {
-        new_cube_faces[0]
-            .faces
-            .push(cube_faces[0].faces[face_index].clone());
-    }
-    for face_index in new_back_faces {
-        new_cube_faces[1]
-            .faces
-            .push(cube_faces[1].faces[face_index].clone());
-    }
-    for face_index in new_top_faces {
-        new_cube_faces[2]
-            .faces
-            .push(cube_faces[2].faces[face_index].clone());
-    }
-    for face_index in new_bottom_faces {
-        new_cube_faces[3]
-            .faces
-            .push(cube_faces[3].faces[face_index].clone());
-    }
-    for face_index in new_left_faces {
-        new_cube_faces[4]
-            .faces
-            .push(cube_faces[4].faces[face_index].clone());
-    }
-    for face_index in new_right_faces {
-        new_cube_faces[5]
-            .faces
-            .push(cube_faces[5].faces[face_index].clone());
-    }
-
-    new_cube_faces
-}
-
-fn perform_raycasts2(cube_faces: &[CubeFace], min_pos: Vec3, max_pos: Vec3) -> Vec<CubeFace> {
-    let half_size = (max_pos - min_pos).max_element() / 2.0;
-    let shape_center = (max_pos + min_pos) / 2.0;
-
-    let half_size_p = half_size + 1.0;
-    let half_size_n = half_size - 1.0;
-
-    let mut new_cube_faces: Vec<CubeFace> = prepare_new_cube_faces(cube_faces);
-    for (i, cube_face) in cube_faces.iter().enumerate() {
-        let hit_faces = get_hit_faces(i, &shape_center, half_size_p, half_size_n, cube_face);
-        for face_index in hit_faces {
-            new_cube_faces[i]
-                .faces
-                .push(cube_faces[i].faces[face_index].clone());
-        }
-    }
-
-    new_cube_faces
-}
-
-fn prepare_new_cube_faces(cube_faces: &[CubeFace]) -> Vec<CubeFace> {
     cube_faces
         .iter()
-        .map(|face| CubeFace {
-            faces: Vec::new(),
-            normal: face.normal,
+        .enumerate()
+        .map(|(i, cube_face)| {
+            let mut hit_faces = HashSet::new();
+
+            for face in &cube_face.faces {
+                for vertex in &face.vertices {
+                    let ray = Ray {
+                        origin: origins[i] + Vec3::new(vertex.x, vertex.y, vertex.z),
+                        direction: directions[i],
+                    };
+                    if let Some(hit_face) = raycast_mesh(&ray, &cube_face.faces) {
+                        hit_faces.insert(hit_face);
+                    }
+                }
+            }
+
+            let mut new_faces = Vec::new();
+            for face_index in hit_faces {
+                new_faces.push(cube_face.faces[face_index].clone());
+            }
+
+            CubeFace {
+                faces: new_faces,
+                normal: cube_face.normal,
+            }
         })
         .collect()
-}
-
-fn get_hit_faces(
-    i: usize,
-    shape_center: &Vec3,
-    half_size_p: f32,
-    half_size_n: f32,
-    cube_face: &CubeFace,
-) -> HashSet<usize> {
-    cube_face
-        .faces
-        .iter()
-        .flat_map(|face| {
-            face.vertices
-                .iter()
-                .filter_map(|vertex| {
-                    let (origin, direction) = get_ray_origin_and_direction(
-                        i,
-                        vertex,
-                        shape_center,
-                        half_size_p,
-                        half_size_n,
-                    );
-                    let ray = Ray { origin, direction };
-                    raycast_mesh(&ray, &cube_face.faces)
-                })
-                .collect::<HashSet<_>>()
-        })
-        .collect()
-}
-
-fn get_ray_origin_and_direction(i: usize, v: &Vec3, c: &Vec3, hp: f32, hn: f32) -> (Vec3, Vec3) {
-    let (cx, cy, cz) = (c.x, c.y, c.z);
-    let (vx, vy, vz) = (v.x, v.y, v.z);
-    match i {
-        0 => (Vec3::new(vx, vy, cz + hp), Vec3::new(0.0, 0.0, -1.0)),
-        1 => (Vec3::new(vx, vy, cz - hn), Vec3::new(0.0, 0.0, 1.0)),
-        2 => (Vec3::new(vx, cy + hp, vz), Vec3::new(0.0, -1.0, 0.0)),
-        3 => (Vec3::new(vx, cy - hn, vz), Vec3::new(0.0, 1.0, 0.0)),
-        4 => (Vec3::new(cx + hp, vy, vz), Vec3::new(-1.0, 0.0, 0.0)),
-        _ => (Vec3::new(cx - hn, vy, vz), Vec3::new(1.0, 0.0, 0.0)),
-    }
 }
 
 /// Generate the mesh data from the faces
