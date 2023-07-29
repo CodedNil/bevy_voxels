@@ -1,6 +1,7 @@
 use crate::subdivision::Cube;
 use bevy::prelude::*;
 use bevy::render::{mesh::Indices, render_resource::PrimitiveTopology};
+use rayon::prelude::*;
 use std::collections::HashSet;
 
 #[derive(Copy, Clone)]
@@ -270,37 +271,49 @@ fn perform_raycasts(cube_faces: &[CubeFace], min_pos: Vec3, max_pos: Vec3) -> Ve
     ];
 
     let mut hit_faces: [HashSet<usize>; 6] = Default::default();
-    for (cube_face_indices, origin) in raycast_data {
-        // Get all faces to cast against
-        let mut total_faces: Vec<FaceRaycast> = Vec::new();
-        for cube_face_index in cube_face_indices {
-            for (index, face) in cube_faces[cube_face_index.as_usize()]
-                .faces
-                .iter()
-                .enumerate()
-            {
-                total_faces.push(FaceRaycast {
-                    index,
-                    face_index: cube_face_index.as_usize(),
-                    vertices: face.vertices,
-                    tris: face.tris,
-                });
-            }
-        }
-        let total_faces = total_faces;
 
-        for face in &total_faces {
-            for vertex in &face.vertices {
-                let origin = origin + *vertex;
-                let direction = (*vertex - origin).normalize();
-                let ray = Ray { origin, direction };
-                if let Some(hit_face) = raycast_mesh(&ray, &total_faces) {
-                    hit_faces[hit_face.face_index].insert(hit_face.index);
+    let hit_faces_temp: Vec<[HashSet<usize>; 6]> = raycast_data
+        .par_iter()
+        .map(|(cube_face_indices, origin)| {
+            let mut hit_faces_temp: [HashSet<usize>; 6] = Default::default();
+            // Get all faces to cast against
+            let mut total_faces: Vec<FaceRaycast> = Vec::new();
+            for cube_face_index in cube_face_indices {
+                for (index, face) in cube_faces[cube_face_index.as_usize()]
+                    .faces
+                    .iter()
+                    .enumerate()
+                {
+                    total_faces.push(FaceRaycast {
+                        index,
+                        face_index: cube_face_index.as_usize(),
+                        vertices: face.vertices,
+                        tris: face.tris,
+                    });
                 }
             }
+            let total_faces = total_faces;
+
+            for face in &total_faces {
+                for vertex in &face.vertices {
+                    let origin = *origin + *vertex;
+                    let direction = (*vertex - origin).normalize();
+                    let ray = Ray { origin, direction };
+                    if let Some(hit_face) = raycast_mesh(&ray, &total_faces) {
+                        hit_faces_temp[hit_face.face_index].insert(hit_face.index);
+                    }
+                }
+            }
+            hit_faces_temp
+        })
+        .collect();
+
+    // Merge the temporary hit_faces into the main hit_faces
+    for temp in hit_faces_temp {
+        for (i, set) in temp.iter().enumerate() {
+            hit_faces[i].extend(set);
         }
     }
-    let hit_faces = hit_faces;
 
     let new_cube_faces: Vec<CubeFace> = hit_faces
         .iter()
@@ -323,10 +336,7 @@ fn perform_raycasts(cube_faces: &[CubeFace], min_pos: Vec3, max_pos: Vec3) -> Ve
 }
 
 /// Perform a raycast against the mesh faces
-fn raycast_mesh<'a>(
-    ray: &'a Ray,
-    faces: &'a Vec<FaceRaycast>,
-) -> Option<&'a FaceRaycast> {
+fn raycast_mesh<'a>(ray: &'a Ray, faces: &'a Vec<FaceRaycast>) -> Option<&'a FaceRaycast> {
     let mut closest_t = None;
     let mut hit_face = None;
 
