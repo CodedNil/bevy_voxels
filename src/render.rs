@@ -1,8 +1,7 @@
-use std::collections::HashSet;
-
 use crate::subdivision::Cube;
 use bevy::prelude::*;
 use bevy::render::{mesh::Indices, render_resource::PrimitiveTopology};
+use std::collections::HashSet;
 
 const FACES: [[usize; 6]; 6] = [
     [2, 1, 0, 3, 1, 2], // Front face
@@ -291,64 +290,15 @@ fn perform_raycasts(cube_faces: &Vec<CubeFace>, min_pos: Vec3, max_pos: Vec3) ->
 
 fn perform_raycasts2(cube_faces: &[CubeFace], min_pos: Vec3, max_pos: Vec3) -> Vec<CubeFace> {
     let half_size = (max_pos - min_pos).max_element() / 2.0;
+    let shape_center = (max_pos + min_pos) / 2.0;
+
     let half_size_p = half_size + 1.0;
     let half_size_n = half_size - 1.0;
-    let shape_center = (max_pos + min_pos) / 2.0;
-    let (shape_x, shape_y, shape_z) = (shape_center.x, shape_center.y, shape_center.z);
 
-    let mut new_cube_faces: Vec<CubeFace> = cube_faces
-        .iter()
-        .map(|face| CubeFace {
-            faces: Vec::new(),
-            normal: face.normal,
-        })
-        .collect();
-
+    let mut new_cube_faces: Vec<CubeFace> = prepare_new_cube_faces(cube_faces);
     for (i, cube_face) in cube_faces.iter().enumerate() {
-        let new_faces: HashSet<usize> = cube_face
-            .faces
-            .iter()
-            .flat_map(|face| {
-                face.vertices
-                    .iter()
-                    .filter_map(|vertex| {
-                        let (vert_x, vert_y, vert_z) = (vertex.x, vertex.y, vertex.z);
-
-                        let (origin, direction) = match i {
-                            0 => (
-                                Vec3::new(vert_x, vert_y, shape_z + half_size_p),
-                                Vec3::new(0.0, 0.0, -1.0),
-                            ),
-                            1 => (
-                                Vec3::new(vert_x, vert_y, shape_z - half_size_n),
-                                Vec3::new(0.0, 0.0, 1.0),
-                            ),
-                            2 => (
-                                Vec3::new(vert_x, shape_y + half_size_p, vert_z),
-                                Vec3::new(0.0, -1.0, 0.0),
-                            ),
-                            3 => (
-                                Vec3::new(vert_x, shape_y - half_size_n, vert_z),
-                                Vec3::new(0.0, 1.0, 0.0),
-                            ),
-                            4 => (
-                                Vec3::new(shape_x + half_size_p, vert_y, vert_z),
-                                Vec3::new(-1.0, 0.0, 0.0),
-                            ),
-                            _ => (
-                                Vec3::new(shape_x - half_size_n, vert_y, vert_z),
-                                Vec3::new(1.0, 0.0, 0.0),
-                            ),
-                        };
-
-                        let ray = Ray { origin, direction };
-                        raycast_mesh(&ray, &cube_face.faces)
-                    })
-                    .collect::<HashSet<_>>()
-            })
-            .collect();
-
-        for face_index in new_faces {
+        let hit_faces = get_hit_faces(i, &shape_center, half_size_p, half_size_n, cube_face);
+        for face_index in hit_faces {
             new_cube_faces[i]
                 .faces
                 .push(cube_faces[i].faces[face_index].clone());
@@ -356,6 +306,58 @@ fn perform_raycasts2(cube_faces: &[CubeFace], min_pos: Vec3, max_pos: Vec3) -> V
     }
 
     new_cube_faces
+}
+
+fn prepare_new_cube_faces(cube_faces: &[CubeFace]) -> Vec<CubeFace> {
+    cube_faces
+        .iter()
+        .map(|face| CubeFace {
+            faces: Vec::new(),
+            normal: face.normal,
+        })
+        .collect()
+}
+
+fn get_hit_faces(
+    i: usize,
+    shape_center: &Vec3,
+    half_size_p: f32,
+    half_size_n: f32,
+    cube_face: &CubeFace,
+) -> HashSet<usize> {
+    cube_face
+        .faces
+        .iter()
+        .flat_map(|face| {
+            face.vertices
+                .iter()
+                .filter_map(|vertex| {
+                    let (origin, direction) = get_ray_origin_and_direction(
+                        i,
+                        vertex,
+                        shape_center,
+                        half_size_p,
+                        half_size_n,
+                    );
+                    let ray = Ray { origin, direction };
+                    raycast_mesh(&ray, &cube_face.faces)
+                })
+                .collect::<HashSet<_>>()
+        })
+        .collect()
+}
+
+fn get_ray_origin_and_direction(i: usize, v: &Vec3, c: &Vec3, hp: f32, hn: f32) -> (Vec3, Vec3) {
+    let (cx, cy, cz) = (c.x, c.y, c.z);
+    let (vx, vy, vz) = (v.x, v.y, v.z);
+    match i {
+        0 => (Vec3::new(vx, vy, cz + hp), Vec3::new(0.0, 0.0, -1.0)),
+        1 => (Vec3::new(vx, vy, cz - hn), Vec3::new(0.0, 0.0, 1.0)),
+        2 => (Vec3::new(vx, cy + hp, vz), Vec3::new(0.0, -1.0, 0.0)),
+        3 => (Vec3::new(vx, cy - hn, vz), Vec3::new(0.0, 1.0, 0.0)),
+        4 => (Vec3::new(cx + hp, vy, vz), Vec3::new(-1.0, 0.0, 0.0)),
+        _ => (Vec3::new(cx - hn, vy, vz), Vec3::new(1.0, 0.0, 0.0)),
+    }
 }
 
 /// Generate the mesh data from the faces
@@ -395,7 +397,7 @@ fn generate_mesh_data(cube_faces: &Vec<CubeFace>, n_cubes: usize) -> MeshData {
 }
 
 /// Perform a raycast against the mesh faces
-fn raycast_mesh(ray: &Ray, faces: &Vec<Face>) -> Option<usize> {
+fn raycast_mesh(ray: &Ray, faces: &[Face]) -> Option<usize> {
     let mut closest_t = None;
     let mut hit_face = None;
 
