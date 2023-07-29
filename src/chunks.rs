@@ -3,8 +3,8 @@ use crate::world_noise;
 use bevy::prelude::*;
 use std::collections::VecDeque;
 
-pub const CHUNK_SIZE: usize = 4;
-const RENDER_DISTANCE: usize = 2;
+pub const CHUNK_SIZE: usize = 8;
+const RENDER_DISTANCE: usize = 1;
 
 struct ExploreResult {
     chunks: Vec<Chunk>,
@@ -69,32 +69,6 @@ pub fn chunk_search(
                 ),
                 ..Default::default()
             });
-        }
-        if chunk.chunk_pos == (-8, 0, 0) {
-            for ray in chunk.rays {
-                let chunk_pos = Vec3::new(
-                    chunk.chunk_pos.0 as f32,
-                    chunk.chunk_pos.2 as f32,
-                    chunk.chunk_pos.1 as f32,
-                );
-                let mid = ray.origin + ray.direction * ray.length / 2.0 + chunk_pos;
-                let rotation =
-                    Quat::from_rotation_arc(Vec3::new(0.0, 1.0, 0.0), ray.direction.normalize());
-    
-                commands.spawn(PbrBundle {
-                    mesh: meshes.add(Mesh::from(shape::Cube { size: 0.1 })),
-                    material: materials.add(StandardMaterial {
-                        base_color: Color::RED,
-                        ..default()
-                    }),
-                    transform: Transform {
-                        translation: mid,
-                        rotation,
-                        scale: Vec3::new(0.05, ray.length * 10.0, 0.05),
-                    },
-                    ..Default::default()
-                });
-            }
         }
         cubes += chunk.n_cubes;
         triangles += chunk.n_triangles;

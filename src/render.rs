@@ -76,17 +76,10 @@ struct Ray {
     direction: Vec3,
 }
 
-pub struct Ray2 {
-    pub origin: Vec3,
-    pub direction: Vec3,
-    pub length: f32,
-}
-
-pub fn cubes_mesh(cubes: &Vec<Cube>, chunk_pos: (f32, f32, f32)) -> (Mesh, usize, Vec<Ray2>) {
+pub fn cubes_mesh(cubes: &Vec<Cube>, chunk_pos: (f32, f32, f32)) -> (Mesh, usize) {
     let (cube_faces, min_pos, max_pos) = generate_cube_faces(cubes, chunk_pos);
-    let (cube_faces, rays) = perform_raycasts(&cube_faces, min_pos, max_pos);
+    let cube_faces = perform_raycasts(&cube_faces, min_pos, max_pos);
     let mesh_data = generate_mesh_data(&cube_faces, cubes.len());
-    // let rays = Vec::new();
 
     let n_triangles = mesh_data.indices.len() / 3;
 
@@ -96,7 +89,7 @@ pub fn cubes_mesh(cubes: &Vec<Cube>, chunk_pos: (f32, f32, f32)) -> (Mesh, usize
     render_mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, mesh_data.colors);
     render_mesh.set_indices(Some(Indices::U32(mesh_data.indices)));
 
-    (render_mesh, n_triangles, rays)
+    (render_mesh, n_triangles)
 }
 
 #[allow(clippy::similar_names)]
@@ -224,18 +217,13 @@ fn generate_mesh_data(cube_faces: &Vec<CubeFace>, n_cubes: usize) -> MeshData {
     }
 }
 
-fn perform_raycasts(
-    cube_faces: &[CubeFace],
-    min_pos: Vec3,
-    max_pos: Vec3,
-) -> (Vec<CubeFace>, Vec<Ray2>) {
+fn perform_raycasts(cube_faces: &[CubeFace], min_pos: Vec3, max_pos: Vec3) -> Vec<CubeFace> {
     let max_size = (max_pos - min_pos).max_element();
     let shape_center = (max_pos + min_pos) / 2.0;
-    let off = max_size * 2.0;
     let (off_x, off_y, off_z) = (
-        shape_center.x + off,
-        shape_center.y + off,
-        shape_center.z + off,
+        shape_center.x + max_size * 1.5,
+        shape_center.y + max_size * 1.5,
+        shape_center.z + max_size * 1.5,
     );
 
     let raycast_data = [
@@ -248,46 +236,49 @@ fn perform_raycasts(
         // (vec![FaceIndex::Right], Vec3::new(-off_x, 0.0, 0.0)),
         // The 8 corners
         (
-            vec![FaceIndex::Front, FaceIndex::Top, FaceIndex::Left],
+            vec![FaceIndex::Left, FaceIndex::Top, FaceIndex::Front],
             Vec3::new(off_x, off_y, off_z),
         ),
-        // (
-        //     vec![FaceIndex::Back, FaceIndex::Bottom, FaceIndex::Right],
-        //     Vec3::new(-off_x, -off_y, -off_z),
-        // ),
-        // (
-        //     vec![FaceIndex::Front, FaceIndex::Bottom, FaceIndex::Left],
-        //     Vec3::new(off_x, -off_y, off_z),
-        // ),
-        // (
-        //     vec![FaceIndex::Front, FaceIndex::Top, FaceIndex::Right],
-        //     Vec3::new(off_x, off_y, off_z),
-        // ),
-        // (
-        //     vec![FaceIndex::Back, FaceIndex::Top, FaceIndex::Left],
-        //     Vec3::new(-off_x, off_y, -off_z),
-        // ),
-        // (
-        //     vec![FaceIndex::Back, FaceIndex::Bottom, FaceIndex::Left],
-        //     Vec3::new(-off_x, -off_y, -off_z),
-        // ),
-        // (
-        //     vec![FaceIndex::Front, FaceIndex::Bottom, FaceIndex::Right],
-        //     Vec3::new(off_x, -off_y, off_z),
-        // ),
-        // (
-        //     vec![FaceIndex::Back, FaceIndex::Top, FaceIndex::Right],
-        //     Vec3::new(-off_x, off_y, -off_z),
-        // ),
+        (
+            vec![FaceIndex::Right, FaceIndex::Bottom, FaceIndex::Back],
+            Vec3::new(-off_x, -off_y, -off_z),
+        ),
+        (
+            vec![FaceIndex::Right, FaceIndex::Top, FaceIndex::Front],
+            Vec3::new(-off_x, off_y, off_z),
+        ),
+        (
+            vec![FaceIndex::Left, FaceIndex::Bottom, FaceIndex::Front],
+            Vec3::new(off_x, -off_y, off_z),
+        ),
+        (
+            vec![FaceIndex::Left, FaceIndex::Top, FaceIndex::Back],
+            Vec3::new(off_x, off_y, -off_z),
+        ),
+        (
+            vec![FaceIndex::Right, FaceIndex::Bottom, FaceIndex::Front],
+            Vec3::new(-off_x, -off_y, off_z),
+        ),
+        (
+            vec![FaceIndex::Left, FaceIndex::Bottom, FaceIndex::Back],
+            Vec3::new(off_x, -off_y, -off_z),
+        ),
+        (
+            vec![FaceIndex::Right, FaceIndex::Top, FaceIndex::Back],
+            Vec3::new(-off_x, off_y, -off_z),
+        ),
     ];
 
     let mut hit_faces: [HashSet<usize>; 6] = Default::default();
-    let mut rays_used: Vec<Ray2> = Vec::new();
     for (cube_face_indices, origin) in raycast_data {
         // Get all faces to cast against
         let mut total_faces: Vec<FaceRaycast> = Vec::new();
         for cube_face_index in cube_face_indices {
-            for (index, face) in cube_faces[cube_face_index.as_usize()].faces.iter().enumerate() {
+            for (index, face) in cube_faces[cube_face_index.as_usize()]
+                .faces
+                .iter()
+                .enumerate()
+            {
                 total_faces.push(FaceRaycast {
                     index,
                     face_index: cube_face_index.as_usize(),
@@ -303,13 +294,8 @@ fn perform_raycasts(
                 let origin = origin + *vertex;
                 let direction = (*vertex - origin).normalize();
                 let ray = Ray { origin, direction };
-                if let (Some(hit_face), Some(length)) = raycast_mesh(&ray, &total_faces) {
+                if let Some(hit_face) = raycast_mesh(&ray, &total_faces) {
                     hit_faces[hit_face.face_index].insert(hit_face.index);
-                    rays_used.push(Ray2 {
-                        origin: ray.origin,
-                        direction: ray.direction,
-                        length,
-                    });
                 }
             }
         }
@@ -333,14 +319,14 @@ fn perform_raycasts(
         })
         .collect();
 
-    (new_cube_faces, rays_used)
+    new_cube_faces
 }
 
 /// Perform a raycast against the mesh faces
 fn raycast_mesh<'a>(
     ray: &'a Ray,
     faces: &'a Vec<FaceRaycast>,
-) -> (Option<&'a FaceRaycast>, Option<f32>) {
+) -> Option<&'a FaceRaycast> {
     let mut closest_t = None;
     let mut hit_face = None;
 
@@ -362,7 +348,7 @@ fn raycast_mesh<'a>(
         }
     }
 
-    (hit_face, closest_t)
+    hit_face
 }
 
 fn ray_triangle_intersect(ray: &Ray, triangle: &[Vec3; 3]) -> Option<f32> {
