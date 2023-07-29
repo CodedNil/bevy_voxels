@@ -12,6 +12,14 @@ const FACES: [[usize; 6]; 6] = [
     [0, 1, 5, 5, 4, 0], // Left face
     [3, 2, 6, 6, 7, 3], // Right face
 ];
+const FACES_VERTICES: [[usize; 4]; 6] = [
+    [0, 1, 2, 3], // Front face
+    [4, 5, 6, 7], // Back face
+    [0, 2, 4, 6], // Top face
+    [1, 3, 5, 7], // Bottom face
+    [0, 1, 4, 5], // Left face
+    [2, 3, 6, 7], // Right face
+];
 const FACE_NORMALS: [Vec3; 6] = [
     Vec3::new(0.0, 0.0, 1.0),  // Front face
     Vec3::new(0.0, 0.0, -1.0), // Back face
@@ -30,6 +38,7 @@ struct CubeFace {
 
 #[derive(Clone)]
 struct Face {
+    vertices: [Vec3; 4],
     tris: [[Vec3; 3]; 2],
     color: [f32; 4],
 }
@@ -117,7 +126,14 @@ fn generate_cube_faces(
 
         // Loop over each face of the cube
         for (face_index, current_face) in FACES.iter().enumerate() {
+            let verts = FACES_VERTICES[face_index];
             cube_faces[face_index].faces.push(Face {
+                vertices: [
+                    corners[verts[0]],
+                    corners[verts[1]],
+                    corners[verts[2]],
+                    corners[verts[3]],
+                ],
                 tris: [
                     [
                         corners[current_face[0]],
@@ -145,9 +161,6 @@ fn perform_raycasts(cube_faces: &Vec<CubeFace>, min_pos: Vec3, max_pos: Vec3) ->
     let max_size = (max_pos - min_pos).max_element();
     let shape_center = (max_pos + min_pos) / 2.0;
 
-    // Perform raycasts against the mesh each direction
-    let ray_step = 0.1;
-
     let front_faces = &cube_faces[0].faces;
     let back_faces = &cube_faces[1].faces;
     let mut new_front_faces: HashSet<usize> = HashSet::new();
@@ -163,79 +176,72 @@ fn perform_raycasts(cube_faces: &Vec<CubeFace>, min_pos: Vec3, max_pos: Vec3) ->
     let mut new_left_faces: HashSet<usize> = HashSet::new();
     let mut new_right_faces: HashSet<usize> = HashSet::new();
 
-    let mut x = shape_center.x - max_size / 2.0;
-    while x < shape_center.x + max_size / 2.0 {
-        let mut y = shape_center.y - max_size / 2.0;
-        while y < shape_center.y + max_size / 2.0 {
+    // Cast a ray at each corner of every face
+    for face in front_faces {
+        for vertex in &face.vertices {
             let front_ray = Ray {
-                origin: Vec3::new(x, y, shape_center.z + max_size / 2.0 + 1.0),
+                origin: Vec3::new(vertex.x, vertex.y, shape_center.z + max_size / 2.0 + 1.0),
                 direction: Vec3::new(0.0, 0.0, -1.0),
             };
             if let Some(hit_face) = raycast_mesh(&front_ray, front_faces) {
                 new_front_faces.insert(hit_face);
             }
-
+        }
+    }
+    for face in back_faces {
+        for vertex in &face.vertices {
             let back_ray = Ray {
-                origin: Vec3::new(x, y, shape_center.z - max_size / 2.0 - 1.0),
+                origin: Vec3::new(vertex.x, vertex.y, shape_center.z - max_size / 2.0 - 1.0),
                 direction: Vec3::new(0.0, 0.0, 1.0),
             };
             if let Some(hit_face) = raycast_mesh(&back_ray, back_faces) {
                 new_back_faces.insert(hit_face);
             }
-
-            y += ray_step;
         }
-        x += ray_step;
     }
-
-    let mut z = shape_center.z - max_size / 2.0;
-    while z < shape_center.z + max_size / 2.0 {
-        let mut y = shape_center.y - max_size / 2.0;
-        while y < shape_center.y + max_size / 2.0 {
-            let left_ray = Ray {
-                origin: Vec3::new(shape_center.x + max_size / 2.0 + 1.0, y, z),
-                direction: Vec3::new(-1.0, 0.0, 0.0),
-            };
-            if let Some(hit_face) = raycast_mesh(&left_ray, left_faces) {
-                new_left_faces.insert(hit_face);
-            }
-
-            let right_ray = Ray {
-                origin: Vec3::new(shape_center.x - max_size / 2.0 - 1.0, y, z),
-                direction: Vec3::new(1.0, 0.0, 0.0),
-            };
-            if let Some(hit_face) = raycast_mesh(&right_ray, right_faces) {
-                new_right_faces.insert(hit_face);
-            }
-
-            y += ray_step;
-        }
-        z += ray_step;
-    }
-
-    let mut x = shape_center.x - max_size / 2.0;
-    while x < shape_center.x + max_size / 2.0 {
-        let mut z = shape_center.z - max_size / 2.0;
-        while z < shape_center.z + max_size / 2.0 {
+    for face in top_faces {
+        for vertex in &face.vertices {
             let top_ray = Ray {
-                origin: Vec3::new(x, shape_center.y + max_size / 2.0 + 1.0, z),
+                origin: Vec3::new(vertex.x, shape_center.y + max_size / 2.0 + 1.0, vertex.z),
                 direction: Vec3::new(0.0, -1.0, 0.0),
             };
             if let Some(hit_face) = raycast_mesh(&top_ray, top_faces) {
                 new_top_faces.insert(hit_face);
             }
-
+        }
+    }
+    for face in bottom_faces {
+        for vertex in &face.vertices {
             let bottom_ray = Ray {
-                origin: Vec3::new(x, shape_center.y - max_size / 2.0 - 1.0, z),
+                origin: Vec3::new(vertex.x, shape_center.y - max_size / 2.0 - 1.0, vertex.z),
                 direction: Vec3::new(0.0, 1.0, 0.0),
             };
             if let Some(hit_face) = raycast_mesh(&bottom_ray, bottom_faces) {
                 new_bottom_faces.insert(hit_face);
             }
-
-            z += ray_step;
         }
-        x += ray_step;
+    }
+    for face in left_faces {
+        for vertex in &face.vertices {
+            let left_ray = Ray {
+                origin: Vec3::new(shape_center.x + max_size / 2.0 + 1.0, vertex.y, vertex.z),
+                direction: Vec3::new(-1.0, 0.0, 0.0),
+            };
+            if let Some(hit_face) = raycast_mesh(&left_ray, left_faces) {
+                new_left_faces.insert(hit_face);
+            }
+        }
+    }
+    for face in right_faces {
+        for vertex in &face.vertices {
+            let right_ray = Ray {
+                origin: Vec3::new(shape_center.x - max_size / 2.0 - 1.0, vertex.y, vertex.z),
+                direction: Vec3::new(1.0, 0.0, 0.0),
+            };
+            if let Some(hit_face) = raycast_mesh(&right_ray, right_faces) {
+                new_right_faces.insert(hit_face);
+            }
+        }
     }
 
     // Replace faces with new right faces
