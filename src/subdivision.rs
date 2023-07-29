@@ -17,6 +17,7 @@ pub struct Chunk {
     pub chunk_pos: (i32, i32, i32),
     pub n_cubes: usize,
     pub n_triangles: usize,
+    pub rays: Vec<render::Ray2>,
 }
 
 #[allow(clippy::cast_precision_loss)]
@@ -27,17 +28,18 @@ pub fn chunk_render(
 ) -> Chunk {
     let chunk_pos_f32 = (chunk_pos.0 as f32, chunk_pos.1 as f32, chunk_pos.2 as f32);
     let cubes: Vec<Cube> = subdivide_cube(data_generator, chunk_pos_f32, chunk_size as f32);
-    let (render_mesh, n_triangles) = if cubes.is_empty() {
-        (None, 0)
+    let (render_mesh, n_triangles, rays) = if cubes.is_empty() {
+        (None, 0, Vec::<render::Ray2>::new())
     } else {
-        let (mesh, triangles) = render::cubes_mesh(&cubes, chunk_pos_f32);
-        (Some(mesh), triangles)
+        let (mesh, triangles, rays) = render::cubes_mesh(&cubes, chunk_pos_f32);
+        (Some(mesh), triangles, rays)
     };
     Chunk {
         mesh: render_mesh,
         chunk_pos,
         n_cubes: cubes.len(),
         n_triangles,
+        rays,
     }
 }
 
@@ -135,8 +137,10 @@ fn render_cube(
     let (px, pz, py) = pos;
     let data_color = data_generator.get_data_color(data2d, px, pz, py);
     Cube {
-        pos: data_color.pos_jittered,
-        size: size * 1.175,
+        pos: pos,
+        size: size,
+        // pos: data_color.pos_jittered,
+        // size: size * 1.175,
         color: data_color.color,
     }
 }
