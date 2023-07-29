@@ -1,5 +1,5 @@
-use crate::render;
-use crate::world_noise::{Data2D, DataGenerator};
+use crate::chunks::render;
+use crate::chunks::world_noise::{Data2D, DataGenerator};
 use bevy::prelude::*;
 use rayon::prelude::*;
 

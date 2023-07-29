@@ -1,5 +1,9 @@
-use crate::subdivision::{chunk_render, Chunk};
-use crate::world_noise;
+mod raycast;
+mod render;
+mod subdivision;
+mod world_noise;
+
+use subdivision::{chunk_render, Chunk};
 use bevy::prelude::*;
 use std::collections::VecDeque;
 

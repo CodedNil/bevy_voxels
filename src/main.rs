@@ -15,11 +15,7 @@ use smooth_bevy_cameras::{
     controllers::unreal::{UnrealCameraBundle, UnrealCameraController, UnrealCameraPlugin},
     LookTransformPlugin,
 };
-
 mod chunks;
-mod render;
-mod subdivision;
-mod world_noise;
 
 fn main() {
     App::new()
