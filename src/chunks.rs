@@ -4,7 +4,7 @@ use bevy::prelude::*;
 use std::collections::VecDeque;
 
 pub const CHUNK_SIZE: usize = 4;
-const RENDER_DISTANCE: usize = 1;
+const RENDER_DISTANCE: usize = 3;
 
 struct ExploreResult {
     chunks: Vec<Chunk>,
