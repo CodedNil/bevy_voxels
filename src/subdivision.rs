@@ -13,7 +13,7 @@ pub struct Cube {
 }
 
 pub struct Chunk {
-    pub mesh: Mesh,
+    pub mesh: Option<Mesh>,
     pub chunk_pos: (i32, i32, i32),
     pub n_cubes: usize,
     pub n_triangles: usize,
@@ -27,7 +27,12 @@ pub fn chunk_render(
 ) -> Chunk {
     let chunk_pos_f32 = (chunk_pos.0 as f32, chunk_pos.1 as f32, chunk_pos.2 as f32);
     let cubes: Vec<Cube> = subdivide_cube(data_generator, chunk_pos_f32, chunk_size as f32);
-    let (render_mesh, n_triangles) = render::cubes_mesh(&cubes, chunk_pos_f32);
+    let (render_mesh, n_triangles) = if cubes.is_empty() {
+        (None, 0)
+    } else {
+        let (mesh, triangles) = render::cubes_mesh(&cubes, chunk_pos_f32);
+        (Some(mesh), triangles)
+    };
     Chunk {
         mesh: render_mesh,
         chunk_pos,

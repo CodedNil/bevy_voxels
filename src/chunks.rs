@@ -55,19 +55,21 @@ pub fn chunk_search(
     let mut triangles = 0;
 
     for chunk in chunks {
-        commands.spawn(PbrBundle {
-            mesh: meshes.add(chunk.mesh),
-            material: materials.add(StandardMaterial {
-                base_color: Color::WHITE,
-                ..default()
-            }),
-            transform: Transform::from_xyz(
-                chunk.chunk_pos.0 as f32,
-                chunk.chunk_pos.2 as f32,
-                chunk.chunk_pos.1 as f32,
-            ),
-            ..Default::default()
-        });
+        if let Some(mesh) = chunk.mesh {
+            commands.spawn(PbrBundle {
+                mesh: meshes.add(mesh),
+                material: materials.add(StandardMaterial {
+                    base_color: Color::WHITE,
+                    ..default()
+                }),
+                transform: Transform::from_xyz(
+                    chunk.chunk_pos.0 as f32,
+                    chunk.chunk_pos.2 as f32,
+                    chunk.chunk_pos.1 as f32,
+                ),
+                ..Default::default()
+            });
+        }
         cubes += chunk.n_cubes;
         triangles += chunk.n_triangles;
     }
