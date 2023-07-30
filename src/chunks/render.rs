@@ -1,5 +1,5 @@
 // use crate::chunks::raycast;
-use crate::chunks::subdivision::Cube;
+use crate::chunks::Cube;
 use bevy::prelude::*;
 use bevy::render::{mesh::Indices, render_resource::PrimitiveTopology};
 

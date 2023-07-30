@@ -7,13 +7,27 @@ use bevy::prelude::*;
 use rayon::prelude::*;
 use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
-use subdivision::{chunk_render, Chunk};
+use subdivision::chunk_render;
 
 pub const CHUNK_SIZE: f32 = 2.0;
+pub const SMALLEST_CUBE_SIZE: f32 = 0.25;
 #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-const RENDER_DISTANCE: usize = (16f32 / CHUNK_SIZE) as usize;
+const RENDER_DISTANCE: usize = (128f32 / CHUNK_SIZE) as usize;
 
 type VisitedSet = Arc<Mutex<HashSet<(i32, i32, i32)>>>;
+
+pub struct Chunk {
+    pub lods: Vec<Mesh>,
+    pub chunk_pos: Vec3,
+    pub n_cubes: usize,
+    pub n_triangles: usize,
+}
+
+pub struct Cube {
+    pub pos: Vec3,
+    pub size: f32,
+    pub color: Vec3,
+}
 
 struct ExploreResult {
     chunks: Vec<Chunk>,
@@ -24,7 +38,8 @@ struct ExploreResult {
 #[allow(
     clippy::cast_precision_loss,
     clippy::cast_possible_truncation,
-    clippy::cast_possible_wrap
+    clippy::cast_possible_wrap,
+    clippy::cast_sign_loss
 )]
 pub fn chunk_search(
     mut commands: Commands,
@@ -61,9 +76,14 @@ pub fn chunk_search(
     let mut triangles = 0;
 
     for chunk in chunks {
-        if let Some(mesh) = chunk.mesh {
+        // Get wanted lod based on distance, if close to origin it should be 0, if close to RENDER_DISTANCE it should be n_lods
+        let n_lods = (CHUNK_SIZE / SMALLEST_CUBE_SIZE).log2() + 1.0;
+        let target_lod =
+            (chunk.chunk_pos.length() / RENDER_DISTANCE as f32 * n_lods).floor() as usize;
+        // Render out the target_lod if it exists
+        if let Some(mesh) = chunk.lods.get(target_lod) {
             commands.spawn(PbrBundle {
-                mesh: meshes.add(mesh),
+                mesh: meshes.add(mesh.clone()),
                 material: materials.add(StandardMaterial {
                     base_color: Color::WHITE,
                     ..default()
