@@ -9,7 +9,7 @@ const SMALLEST_CUBE_SIZE: f32 = 0.25;
 pub struct Cube {
     pub pos: (f32, f32, f32),
     pub size: f32,
-    pub color: (f32, f32, f32),
+    pub color: Vec3,
 }
 
 pub struct Chunk {

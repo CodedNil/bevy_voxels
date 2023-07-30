@@ -1,8 +1,24 @@
+use bevy::prelude::*;
 use noise::{NoiseFn, OpenSimplex};
 use std::f32::consts::PI;
 
+const ROOM_SPACING: f32 = 150.0;
+
 fn lerp(start: f32, end: f32, percentage: f32) -> f32 {
     start + percentage * (end - start)
+}
+
+fn smoothstep(edge0: f32, edge1: f32, x: f32) -> f32 {
+    let t = ((x - edge0) / (edge1 - edge0)).clamp(0.0, 1.0);
+    t * t * (3.0 - 2.0 * t)
+}
+
+#[derive(PartialEq)]
+pub enum FloorMaterial {
+    Stone,
+    Sand,
+    Moss,
+    Dirt,
 }
 
 pub struct DataGenerator {
@@ -12,6 +28,11 @@ pub struct DataGenerator {
 pub struct Data2D {
     pub elevation: f32,
     pub smoothness: f32,
+    pub temperature: f32,
+    pub humidity: f32,
+    pub lushness: f32,
+    pub development: f32,
+    pub rock_color: Vec3,
     pub room_position: [f32; 2],
     pub room_dist: f32,
     pub room_size: f32,
@@ -19,11 +40,14 @@ pub struct Data2D {
     pub corridor_dist: f32,
     pub room_floor: f32,
     pub room_ceiling: f32,
+    pub floor_material: FloorMaterial,
+    pub floor_variance1: f32,
+    pub floor_variance2: f32,
+    pub floor_variance3: f32,
 }
 
 pub struct DataColor {
-    pub color: (f32, f32, f32),
-    pub material: String,
+    pub color: Vec3,
     pub pos_jittered: (f32, f32, f32),
 }
 
@@ -59,21 +83,34 @@ impl DataGenerator {
         let elevation = self.get_world_noise2d(0.0, 0.01, x, z) * 5.0;
         let smoothness = self.get_world_noise2d(1.0, 0.01, x, z);
 
-        let room_spacing = 150.0;
+        let temperature = self.get_world_noise2d(2.0, 0.0025, x, z);
+        let humidity = self.get_world_noise2d(3.0, 0.0025, x, z);
+        let lushness = self.get_world_noise2d(4.0, 0.01, x, z);
+        let development = self.get_world_noise2d(5.0, 0.01, x, z);
+
+        // Rock types for colour, iron is red, calcium is white, graphite is black, apatite is blue
+        let calcium = self.get_world_noise2d(6.0, 0.01, x, z);
+        let graphite = self.get_world_noise2d(7.0, 0.01, x, z);
+        let iron = self.get_world_noise2d(8.0, 0.01, x, z);
+        let rock_color = Vec3::new(
+            calcium * 0.8 - graphite * 0.5 + iron * 0.3,
+            calcium * 0.8 - graphite * 0.5 + iron * 0.05,
+            calcium * 0.8 - graphite * 0.5,
+        );
 
         // Get data for the room
         // Get 2d room center position, pos2d snapped to nearest room spacing point
         let room_position = [
-            (x / room_spacing).round() * room_spacing,
-            (z / room_spacing).round() * room_spacing,
+            (x / ROOM_SPACING).round() * ROOM_SPACING,
+            (z / ROOM_SPACING).round() * ROOM_SPACING,
         ];
         // Get room noise seed, based on room position
         let room_seed = room_position[0] + room_position[1] * 123.0;
 
         // Get position offset by noise, so it is not on a perfect grid
         let horizontal_offset = [
-            self.get_world_noise(2.0, 0.025, z / 4.0) * (room_spacing / 3.0),
-            self.get_world_noise(3.0, 0.025, x / 4.0) * (room_spacing / 3.0),
+            self.get_world_noise(2.0, 0.025, z / 4.0) * (ROOM_SPACING / 3.0),
+            self.get_world_noise(3.0, 0.025, x / 4.0) * (ROOM_SPACING / 3.0),
         ];
         let room_position = [
             room_position[0] + horizontal_offset[0],
@@ -117,9 +154,37 @@ impl DataGenerator {
         let room_floor = 8.0 - self.get_world_noise2d(5.0, 0.01, x, z) * 4.0;
         let room_ceiling = 2.0 + self.get_world_noise2d(6.0, 0.01, x, z) * 3.0;
 
+        // Get floor material variables
+        let floor_variance1 = self.get_world_noise2d(7.0, 0.05, x, z);
+        let floor_variance2 = self.get_world_noise2d(8.0, 0.15, x, z) * 0.5;
+        let floor_variance3 = self.get_world_noise2d(9.0, 0.05, x + 500.0, z + 500.0) * 0.5;
+        let noise_offset = self.get_world_noise2d(10.0, 0.05, x, z) * 0.02;
+
+        // Get floor material
+        let floor_material = if temperature > 0.6 + noise_offset && humidity < 0.4 + noise_offset {
+            FloorMaterial::Sand
+        } else if humidity > 0.5 + noise_offset
+            && floor_variance1 > 0.3 + noise_offset
+            && floor_variance1 - floor_variance2 > 0.05 + noise_offset
+        {
+            FloorMaterial::Moss
+        } else if humidity > 0.5 + noise_offset
+            && (floor_variance1 - floor_variance2 * 0.5 > 0.05 + noise_offset
+                || floor_variance2 + noise_offset < 0.3)
+        {
+            FloorMaterial::Dirt
+        } else {
+            FloorMaterial::Stone
+        };
+
         Data2D {
             elevation,
             smoothness,
+            temperature,
+            humidity,
+            lushness,
+            development,
+            rock_color,
             room_position,
             room_dist,
             room_size: room_size_lerp,
@@ -127,6 +192,10 @@ impl DataGenerator {
             corridor_dist,
             room_floor,
             room_ceiling,
+            floor_material,
+            floor_variance1,
+            floor_variance2,
+            floor_variance3,
         }
     }
 
@@ -152,28 +221,41 @@ impl DataGenerator {
     pub fn get_data_color(&self, data2d: &Data2D, x: f32, z: f32, y: f32) -> DataColor {
         // Color from dark to light gray as elevation increases
         let shade: f32 = y / 50.0;
-        let rock_color: (f32, f32, f32) = (0.8, 0.6, 0.3);
-        let color: (f32, f32, f32) = (
-            rock_color.0 + shade,
-            rock_color.1 + shade,
-            rock_color.2 + shade,
-        );
-        let material = "standard".to_string();
+        let mut color = data2d.rock_color + shade;
 
         // Give the color horizontal lines from noise to make it look more natural
         let noise_shade: f32 = 0.1 + self.get_noise(y * 20.0 + x * 0.01 + z + 0.01) * 0.1;
-        let color = (
-            color.0 + noise_shade,
-            color.1 + noise_shade,
-            color.2 + noise_shade,
-        );
+        color += noise_shade;
         // Add brown colors based on 2d noise
         let noise_color = 0.5 + self.get_world_noise2d(0.0, 0.1, x, z) / 2.0;
-        let color = (
-            color.0 + noise_color * 0.1,
-            color.1 + noise_color * 0.05,
-            color.2,
-        );
+        color += Vec3::new(noise_color * 0.1, noise_color * 0.05, 0.0);
+        // Add dark stone patches
+        if data2d.floor_variance3 < 0.5 {
+            color = color.lerp(color * 0.5, smoothstep(0.5, 0.3, data2d.floor_variance3));
+        }
+
+        // Add color to floors
+        if y < (data2d.room_floor - 4.0) * 4.0 - 2.0 {
+            let color_variance = data2d.floor_variance1 * 0.15;
+            color = match data2d.floor_material {
+                FloorMaterial::Sand => Vec3::new(
+                    1.0 + color_variance,
+                    0.9 + color_variance,
+                    0.6 + color_variance,
+                ),
+                FloorMaterial::Dirt => Vec3::new(
+                    0.6 + color_variance,
+                    0.3 + color_variance,
+                    0.05 + color_variance,
+                ),
+                _ => color,
+            };
+        }
+        if data2d.floor_material == FloorMaterial::Moss {
+            let color_variance = data2d.floor_variance1 * 0.15;
+            color = Vec3::new(0.3, 0.4, 0.1).lerp(Vec3::new(0.2, 0.4, 0.15), data2d.lushness)
+                + Vec3::new(color_variance, color_variance, color_variance);
+        }
 
         // Jitter the position with noise to make it look more natural
         let pos_jittered = (
@@ -184,7 +266,6 @@ impl DataGenerator {
 
         DataColor {
             color,
-            material,
             pos_jittered,
         }
     }

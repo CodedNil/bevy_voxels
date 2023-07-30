@@ -51,7 +51,7 @@ struct MeshData {
 
 pub fn cubes_mesh(cubes: &Vec<Cube>, chunk_pos: (f32, f32, f32)) -> (Mesh, usize) {
     let (cube_faces, min_pos, max_pos) = generate_cube_faces(cubes, chunk_pos);
-    let cube_faces = raycast::perform_raycasts(&cube_faces, min_pos, max_pos);
+    // let cube_faces = raycast::perform_raycasts(&cube_faces, min_pos, max_pos);
     let mesh_data = generate_mesh_data(&cube_faces, cubes.len());
 
     let n_triangles = mesh_data.indices.len() / 3;
@@ -116,7 +116,7 @@ fn generate_cube_faces(
         min_pos = min_pos.min(Vec3::new(real_x_minus, real_y_minus, real_z_minus));
         max_pos = max_pos.max(Vec3::new(real_x_plus, real_y_plus, real_z_plus));
 
-        let color = [cube.color.0, cube.color.1, cube.color.2, 1.0];
+        let color = [cube.color.x, cube.color.y, cube.color.z, 1.0];
 
         // Loop over each face of the cube
         for (face_index, current_face) in FACES.iter().enumerate() {
