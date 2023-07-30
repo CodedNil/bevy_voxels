@@ -156,6 +156,7 @@ fn generate_cube_faces(
 
 /// Generate the mesh data from the faces
 #[allow(clippy::cast_possible_truncation)]
+#[allow(clippy::cast_sign_loss)]
 fn generate_mesh_data(cube_faces: &Vec<CubeFace>, n_cubes: usize) -> MeshData {
     let mut positions: Vec<[f32; 3]> = Vec::with_capacity(n_cubes * 36);
     let mut normals: Vec<[f32; 3]> = Vec::with_capacity(n_cubes * 36);
@@ -166,15 +167,15 @@ fn generate_mesh_data(cube_faces: &Vec<CubeFace>, n_cubes: usize) -> MeshData {
         let normal: [f32; 3] = cube_face.normal.into();
         for current_face in &cube_face.faces {
             let base_index = indices.len() as u32;
-            // Render out both tris
-            for (vertex_index, vertex) in current_face.tris[0].iter().enumerate() {
-                indices.push(base_index + vertex_index as u32);
-                positions.push((*vertex).into());
-                normals.push(normal);
-                colors.push(current_face.color);
-            }
-            for (vertex_index, vertex) in current_face.tris[1].iter().enumerate() {
-                indices.push(base_index + vertex_index as u32 + 3);
+
+            for (tri_index, vertex) in current_face
+                .tris
+                .iter()
+                .flat_map(|tri| tri.iter())
+                .enumerate()
+            {
+                let index = base_index + tri_index as u32;
+                indices.push(index);
                 positions.push((*vertex).into());
                 normals.push(normal);
                 colors.push(current_face.color);

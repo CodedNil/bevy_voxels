@@ -30,107 +30,8 @@ struct Ray {
     direction: Vec3,
 }
 
-#[allow(clippy::too_many_lines)]
 pub fn perform_raycasts(cube_faces: &[CubeFace], min_pos: Vec3, max_pos: Vec3) -> Vec<CubeFace> {
-    let max_size = (max_pos - min_pos).max_element();
-    let shape_center = (max_pos + min_pos) / 2.0;
-    let (off_x, off_y, off_z) = (
-        shape_center.x + max_size * 1.5,
-        shape_center.y + max_size * 1.5,
-        shape_center.z + max_size * 1.5,
-    );
-
-    let raycast_data = [
-        // Each of the 6 directions
-        (vec![FaceIndex::Front], Vec3::new(0.0, 0.0, off_z)),
-        (vec![FaceIndex::Back], Vec3::new(0.0, 0.0, -off_z)),
-        (vec![FaceIndex::Top], Vec3::new(0.0, off_y, 0.0)),
-        (vec![FaceIndex::Bottom], Vec3::new(0.0, -off_y, 0.0)),
-        (vec![FaceIndex::Left], Vec3::new(off_x, 0.0, 0.0)),
-        (vec![FaceIndex::Right], Vec3::new(-off_x, 0.0, 0.0)),
-        // The 12 2d corners
-        (
-            vec![FaceIndex::Left, FaceIndex::Front],
-            Vec3::new(off_x, 0.0, off_z),
-        ),
-        (
-            vec![FaceIndex::Left, FaceIndex::Back],
-            Vec3::new(off_x, 0.0, -off_z),
-        ),
-        (
-            vec![FaceIndex::Right, FaceIndex::Front],
-            Vec3::new(-off_x, 0.0, off_z),
-        ),
-        (
-            vec![FaceIndex::Right, FaceIndex::Back],
-            Vec3::new(-off_x, 0.0, -off_z),
-        ),
-        (
-            vec![FaceIndex::Top, FaceIndex::Front],
-            Vec3::new(0.0, off_y, off_z),
-        ),
-        (
-            vec![FaceIndex::Top, FaceIndex::Back],
-            Vec3::new(0.0, off_y, -off_z),
-        ),
-        (
-            vec![FaceIndex::Top, FaceIndex::Left],
-            Vec3::new(-off_x, off_y, 0.0),
-        ),
-        (
-            vec![FaceIndex::Top, FaceIndex::Right],
-            Vec3::new(-off_x, off_y, 0.0),
-        ),
-        (
-            vec![FaceIndex::Bottom, FaceIndex::Front],
-            Vec3::new(0.0, -off_y, off_z),
-        ),
-        (
-            vec![FaceIndex::Bottom, FaceIndex::Back],
-            Vec3::new(0.0, -off_y, -off_z),
-        ),
-        (
-            vec![FaceIndex::Bottom, FaceIndex::Left],
-            Vec3::new(-off_x, -off_y, 0.0),
-        ),
-        (
-            vec![FaceIndex::Bottom, FaceIndex::Right],
-            Vec3::new(-off_x, -off_y, 0.0),
-        ),
-        // The 8 3dr corners
-        (
-            vec![FaceIndex::Left, FaceIndex::Top, FaceIndex::Front],
-            Vec3::new(off_x, off_y, off_z),
-        ),
-        (
-            vec![FaceIndex::Right, FaceIndex::Bottom, FaceIndex::Back],
-            Vec3::new(-off_x, -off_y, -off_z),
-        ),
-        (
-            vec![FaceIndex::Right, FaceIndex::Top, FaceIndex::Front],
-            Vec3::new(-off_x, off_y, off_z),
-        ),
-        (
-            vec![FaceIndex::Left, FaceIndex::Bottom, FaceIndex::Front],
-            Vec3::new(off_x, -off_y, off_z),
-        ),
-        (
-            vec![FaceIndex::Left, FaceIndex::Top, FaceIndex::Back],
-            Vec3::new(off_x, off_y, -off_z),
-        ),
-        (
-            vec![FaceIndex::Right, FaceIndex::Bottom, FaceIndex::Front],
-            Vec3::new(-off_x, -off_y, off_z),
-        ),
-        (
-            vec![FaceIndex::Left, FaceIndex::Bottom, FaceIndex::Back],
-            Vec3::new(off_x, -off_y, -off_z),
-        ),
-        (
-            vec![FaceIndex::Right, FaceIndex::Top, FaceIndex::Back],
-            Vec3::new(-off_x, off_y, -off_z),
-        ),
-    ];
+    let raycast_data = get_raycast_data(min_pos, max_pos);
 
     let mut hit_faces: [HashSet<usize>; 6] = Default::default();
 
@@ -138,23 +39,25 @@ pub fn perform_raycasts(cube_faces: &[CubeFace], min_pos: Vec3, max_pos: Vec3) -
         .par_iter()
         .map(|(cube_face_indices, origin)| {
             let mut hit_faces_temp: [HashSet<usize>; 6] = Default::default();
+
             // Get all faces to cast against
-            let mut total_faces: Vec<FaceRaycast> = Vec::new();
-            for cube_face_index in cube_face_indices {
-                for (index, face) in cube_faces[cube_face_index.as_usize()]
-                    .faces
-                    .iter()
-                    .enumerate()
-                {
-                    total_faces.push(FaceRaycast {
-                        index,
-                        face_index: cube_face_index.as_usize(),
-                        vertices: face.vertices,
-                        tris: face.tris,
-                    });
-                }
-            }
-            let total_faces = total_faces;
+            let total_faces: Vec<FaceRaycast> = cube_face_indices
+                .par_iter()
+                .map(|&cube_face_index| {
+                    cube_faces[cube_face_index.as_usize()]
+                        .faces
+                        .par_iter()
+                        .enumerate()
+                        .map(|(index, face)| FaceRaycast {
+                            index,
+                            face_index: cube_face_index.as_usize(),
+                            vertices: face.vertices,
+                            tris: face.tris,
+                        })
+                        .collect::<Vec<_>>()
+                })
+                .flatten()
+                .collect();
 
             total_faces
                 .par_iter()
@@ -270,4 +173,106 @@ fn ray_triangle_intersect(ray: &Ray, triangle: &[Vec3; 3]) -> Option<f32> {
     } else {
         None
     }
+}
+
+fn get_raycast_data(min_pos: Vec3, max_pos: Vec3) -> [(Vec<FaceIndex>, Vec3); 26] {
+    let max_size = (max_pos - min_pos).max_element();
+    let shape_center = (max_pos + min_pos) / 2.0;
+    let (off_x, off_y, off_z) = (
+        shape_center.x + max_size * 1.5,
+        shape_center.y + max_size * 1.5,
+        shape_center.z + max_size * 1.5,
+    );
+
+    [
+        // Each of the 6 directions
+        (vec![FaceIndex::Front], Vec3::new(0.0, 0.0, off_z)),
+        (vec![FaceIndex::Back], Vec3::new(0.0, 0.0, -off_z)),
+        (vec![FaceIndex::Top], Vec3::new(0.0, off_y, 0.0)),
+        (vec![FaceIndex::Bottom], Vec3::new(0.0, -off_y, 0.0)),
+        (vec![FaceIndex::Left], Vec3::new(off_x, 0.0, 0.0)),
+        (vec![FaceIndex::Right], Vec3::new(-off_x, 0.0, 0.0)),
+        // The 12 2d corners
+        (
+            vec![FaceIndex::Left, FaceIndex::Front],
+            Vec3::new(off_x, 0.0, off_z),
+        ),
+        (
+            vec![FaceIndex::Left, FaceIndex::Back],
+            Vec3::new(off_x, 0.0, -off_z),
+        ),
+        (
+            vec![FaceIndex::Right, FaceIndex::Front],
+            Vec3::new(-off_x, 0.0, off_z),
+        ),
+        (
+            vec![FaceIndex::Right, FaceIndex::Back],
+            Vec3::new(-off_x, 0.0, -off_z),
+        ),
+        (
+            vec![FaceIndex::Top, FaceIndex::Front],
+            Vec3::new(0.0, off_y, off_z),
+        ),
+        (
+            vec![FaceIndex::Top, FaceIndex::Back],
+            Vec3::new(0.0, off_y, -off_z),
+        ),
+        (
+            vec![FaceIndex::Top, FaceIndex::Left],
+            Vec3::new(-off_x, off_y, 0.0),
+        ),
+        (
+            vec![FaceIndex::Top, FaceIndex::Right],
+            Vec3::new(-off_x, off_y, 0.0),
+        ),
+        (
+            vec![FaceIndex::Bottom, FaceIndex::Front],
+            Vec3::new(0.0, -off_y, off_z),
+        ),
+        (
+            vec![FaceIndex::Bottom, FaceIndex::Back],
+            Vec3::new(0.0, -off_y, -off_z),
+        ),
+        (
+            vec![FaceIndex::Bottom, FaceIndex::Left],
+            Vec3::new(-off_x, -off_y, 0.0),
+        ),
+        (
+            vec![FaceIndex::Bottom, FaceIndex::Right],
+            Vec3::new(-off_x, -off_y, 0.0),
+        ),
+        // The 8 3dr corners
+        (
+            vec![FaceIndex::Left, FaceIndex::Top, FaceIndex::Front],
+            Vec3::new(off_x, off_y, off_z),
+        ),
+        (
+            vec![FaceIndex::Right, FaceIndex::Bottom, FaceIndex::Back],
+            Vec3::new(-off_x, -off_y, -off_z),
+        ),
+        (
+            vec![FaceIndex::Right, FaceIndex::Top, FaceIndex::Front],
+            Vec3::new(-off_x, off_y, off_z),
+        ),
+        (
+            vec![FaceIndex::Left, FaceIndex::Bottom, FaceIndex::Front],
+            Vec3::new(off_x, -off_y, off_z),
+        ),
+        (
+            vec![FaceIndex::Left, FaceIndex::Top, FaceIndex::Back],
+            Vec3::new(off_x, off_y, -off_z),
+        ),
+        (
+            vec![FaceIndex::Right, FaceIndex::Bottom, FaceIndex::Front],
+            Vec3::new(-off_x, -off_y, off_z),
+        ),
+        (
+            vec![FaceIndex::Left, FaceIndex::Bottom, FaceIndex::Back],
+            Vec3::new(off_x, -off_y, -off_z),
+        ),
+        (
+            vec![FaceIndex::Right, FaceIndex::Top, FaceIndex::Back],
+            Vec3::new(-off_x, off_y, -off_z),
+        ),
+    ]
 }
