@@ -1,14 +1,14 @@
-mod raycast;
+// mod raycast;
 mod render;
 mod subdivision;
 mod world_noise;
 
-use subdivision::{chunk_render, Chunk};
 use bevy::prelude::*;
 use std::collections::VecDeque;
+use subdivision::{chunk_render, Chunk};
 
-pub const CHUNK_SIZE: usize = 8;
-const RENDER_DISTANCE: usize = 4;
+const RENDER_DISTANCE: usize = 16;
+pub const CHUNK_SIZE: f32 = 2.0;
 
 struct ExploreResult {
     chunks: Vec<Chunk>,
@@ -66,11 +66,7 @@ pub fn chunk_search(
                     base_color: Color::WHITE,
                     ..default()
                 }),
-                transform: Transform::from_xyz(
-                    chunk.chunk_pos.0 as f32,
-                    chunk.chunk_pos.2 as f32,
-                    chunk.chunk_pos.1 as f32,
-                ),
+                transform: Transform::from_translation(chunk.chunk_pos),
                 ..Default::default()
             });
         }
@@ -150,10 +146,10 @@ fn explore_chunk(
 
         let chunk = chunk_render(
             data_generator,
-            (
-                neighbor.0 * CHUNK_SIZE as i32,
-                neighbor.2 * CHUNK_SIZE as i32,
-                neighbor.1 * CHUNK_SIZE as i32,
+            Vec3::new(
+                neighbor.0 as f32 * CHUNK_SIZE,
+                neighbor.2 as f32 * CHUNK_SIZE,
+                neighbor.1 as f32 * CHUNK_SIZE,
             ),
             CHUNK_SIZE,
         );

@@ -1,4 +1,4 @@
-use crate::chunks::raycast;
+// use crate::chunks::raycast;
 use crate::chunks::subdivision::Cube;
 use bevy::prelude::*;
 use bevy::render::{mesh::Indices, render_resource::PrimitiveTopology};
@@ -49,7 +49,7 @@ struct MeshData {
     indices: Vec<u32>,
 }
 
-pub fn cubes_mesh(cubes: &Vec<Cube>, chunk_pos: (f32, f32, f32)) -> (Mesh, usize) {
+pub fn cubes_mesh(cubes: &Vec<Cube>, chunk_pos: Vec3) -> (Mesh, usize) {
     let (cube_faces, min_pos, max_pos) = generate_cube_faces(cubes, chunk_pos);
     // let cube_faces = raycast::perform_raycasts(&cube_faces, min_pos, max_pos);
     let mesh_data = generate_mesh_data(&cube_faces, cubes.len());
@@ -66,11 +66,8 @@ pub fn cubes_mesh(cubes: &Vec<Cube>, chunk_pos: (f32, f32, f32)) -> (Mesh, usize
 }
 
 #[allow(clippy::similar_names)]
-fn generate_cube_faces(
-    cubes: &Vec<Cube>,
-    chunk_pos: (f32, f32, f32),
-) -> (Vec<CubeFace>, Vec3, Vec3) {
-    let (chunk_x, chunk_z, chunk_y) = chunk_pos;
+fn generate_cube_faces(cubes: &Vec<Cube>, chunk_pos: Vec3) -> (Vec<CubeFace>, Vec3, Vec3) {
+    let (chunk_x, chunk_y, chunk_z) = chunk_pos.into();
 
     let n_cubes = cubes.len();
 
@@ -83,22 +80,22 @@ fn generate_cube_faces(
     }
 
     // Initialize min and max positions with the first cube's position
-    let mut min_pos = Vec3::new(cubes[0].pos.0, cubes[0].pos.1, cubes[0].pos.2);
-    let mut max_pos = Vec3::new(cubes[0].pos.0, cubes[0].pos.1, cubes[0].pos.2);
+    let mut min_pos = cubes[0].pos;
+    let mut max_pos = cubes[0].pos;
 
     for cube in cubes {
         let half_size = cube.size / 2.0;
 
-        let (corner_x, corner_z, corner_y) = cube.pos;
-        let (real_x, real_z, real_y) = (corner_x - chunk_x, corner_z - chunk_z, corner_y - chunk_y);
+        let (corner_x, corner_y, corner_z) = cube.pos.into();
+        let (real_x, real_y, real_z) = (corner_x - chunk_x, corner_y - chunk_y, corner_z - chunk_z);
 
-        let (real_x_minus, real_x_plus, real_z_minus, real_z_plus, real_y_minus, real_y_plus) = (
+        let (real_x_minus, real_x_plus, real_y_minus, real_y_plus, real_z_minus, real_z_plus) = (
             real_x - half_size,
             real_x + half_size,
-            real_z - half_size,
-            real_z + half_size,
             real_y - half_size,
             real_y + half_size,
+            real_z - half_size,
+            real_z + half_size,
         );
 
         let corners = [

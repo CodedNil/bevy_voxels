@@ -48,7 +48,7 @@ pub struct Data2D {
 
 pub struct DataColor {
     pub color: Vec3,
-    pub pos_jittered: (f32, f32, f32),
+    pub pos_jittered: Vec3,
 }
 
 #[allow(clippy::cast_possible_truncation)]
@@ -235,33 +235,33 @@ impl DataGenerator {
         }
 
         // Add color to floors
-        if y < (data2d.room_floor - 4.0) * 4.0 - 2.0 {
-            let color_variance = data2d.floor_variance1 * 0.15;
-            color = match data2d.floor_material {
-                FloorMaterial::Sand => Vec3::new(
-                    1.0 + color_variance,
-                    0.9 + color_variance,
-                    0.6 + color_variance,
-                ),
-                FloorMaterial::Dirt => Vec3::new(
-                    0.6 + color_variance,
-                    0.3 + color_variance,
-                    0.05 + color_variance,
-                ),
-                _ => color,
-            };
-        }
-        if data2d.floor_material == FloorMaterial::Moss {
-            let color_variance = data2d.floor_variance1 * 0.15;
-            color = Vec3::new(0.3, 0.4, 0.1).lerp(Vec3::new(0.2, 0.4, 0.15), data2d.lushness)
-                + Vec3::new(color_variance, color_variance, color_variance);
-        }
+        // if y < (data2d.room_floor - 4.0) * 4.0 - 2.0 {
+        //     let color_variance = data2d.floor_variance1 * 0.15;
+        //     color = match data2d.floor_material {
+        //         FloorMaterial::Sand => Vec3::new(
+        //             1.0 + color_variance,
+        //             0.9 + color_variance,
+        //             0.6 + color_variance,
+        //         ),
+        //         FloorMaterial::Dirt => Vec3::new(
+        //             0.6 + color_variance,
+        //             0.3 + color_variance,
+        //             0.05 + color_variance,
+        //         ),
+        //         _ => color,
+        //     };
+        // }
+        // if data2d.floor_material == FloorMaterial::Moss {
+        //     let color_variance = data2d.floor_variance1 * 0.15;
+        //     color = Vec3::new(0.3, 0.4, 0.1).lerp(Vec3::new(0.2, 0.4, 0.15), data2d.lushness)
+        //         + Vec3::new(color_variance, color_variance, color_variance);
+        // }
 
         // Jitter the position with noise to make it look more natural
-        let pos_jittered = (
+        let pos_jittered = Vec3::new(
             x + (self.get_noise2d(z, y) * 0.2),
-            z + (self.get_noise2d(x, y) * 0.2),
             y + data2d.elevation,
+            z + (self.get_noise2d(x, y) * 0.2),
         );
 
         DataColor {
